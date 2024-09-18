@@ -1,11 +1,11 @@
-use crate::ast::{Program, Definition, FrameDefinition, Macro, Using, Instruction};
+use crate::ast::{Program, Definition, FrameDefinition, SlotDefinition, Macro, Using, Instruction};
 
 grammar;
 
 pub Program: Program = (<Definition>)*;
 
 Definition: Definition = {
-    "frame" <name: Identifier> "{" <slots: (<Identifier>)*> "}" => 
+    "frame" <name: Identifier> "{" <slots: (<Slot>)*> "}" =>
         Definition::Frame(FrameDefinition { name, slots }),
 
     "macro" <name: Identifier> "(" <parameters: VariableList> ")" "{" <block: Block> "}" =>
@@ -13,6 +13,11 @@ Definition: Definition = {
 
     "using" <frame: Identifier> "{" <block: Block> "}" => 
         Definition::Using(Using { frame, block }),
+}
+
+Slot: SlotDefinition = {
+    <Identifier> => SlotDefinition::Variable(<>),
+    <name: Identifier> ":" <frame: Identifier> => SlotDefinition::SubFrame(name, frame),
 }
 
 Block = (<Instruction>)*;

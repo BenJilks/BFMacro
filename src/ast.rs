@@ -10,7 +10,13 @@ pub enum Definition {
 #[derive(Debug, Clone)]
 pub struct FrameDefinition {
     pub name: String,
-    pub slots: Vec<String>,
+    pub slots: Vec<SlotDefinition>,
+}
+
+#[derive(Debug, Clone)]
+pub enum SlotDefinition {
+    Variable(String),
+    SubFrame(String, String),
 }
 
 #[derive(Debug, Clone)]

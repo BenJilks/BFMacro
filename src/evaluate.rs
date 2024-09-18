@@ -64,7 +64,7 @@ fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std:
         exit(1);
     });
 
-    let frame = Frame::from(frame_definition);
+    let frame = Frame::from_definition(frame_definition, scope);
     evaluate(output, &frame, 0, &using.block, scope)
 }
 
