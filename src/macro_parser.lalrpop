@@ -1,0 +1,43 @@
+use crate::ast::{Program, Definition, FrameDefinition, Macro, Using, Instruction};
+
+grammar;
+
+pub Program: Program = (<Definition>)*;
+
+Definition: Definition = {
+    "frame" <name: Identifier> "{" <slots: (<Identifier>)*> "}" => 
+        Definition::Frame(FrameDefinition { name, slots }),
+
+    "macro" <name: Identifier> "(" <parameters: VariableList> ")" "{" <block: Block> "}" =>
+        Definition::Macro(Macro { name, parameters, block }),
+
+    "using" <frame: Identifier> "{" <block: Block> "}" => 
+        Definition::Using(Using { frame, block }),
+}
+
+Block = (<Instruction>)*;
+
+Instruction: Instruction = {
+    "+" => Instruction::Add,
+    "-" => Instruction::Subtract,
+    "<" => Instruction::Left,
+    ">" => Instruction::Right,
+    "," => Instruction::Input,
+    "." => Instruction::Output,
+    "[" => Instruction::OpenLoop,
+    "]" => Instruction::CloseLoop,
+    <Identifier> => Instruction::Variable(<>),
+
+    <name: Identifier> "(" <arguments: VariableList> ")" =>
+        Instruction::MacroInvoke(name, arguments),
+}
+
+VariableList: Vec<String> = {
+    <variables: (<Identifier> ",")*> <last: Identifier?> => {
+        let mut variables = variables;
+        variables.extend(last);
+        variables
+    }
+}
+
+Identifier: String = <s:r"[a-zA-Z_][a-zA-Z0-9_]*"> => s.to_owned();
