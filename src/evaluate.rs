@@ -67,7 +67,7 @@ fn evaluate(
             }
 
             Instruction::Using(using) => {
-                evaluate_using(output, using, scope)?;
+                frame_offset += evaluate_using(output, using, scope)?;
             }
 
             Instruction::Variable(name) => {
@@ -102,15 +102,13 @@ fn evaluate(
     Ok(frame_offset)
 }
 
-fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std::io::Result<()> {
+fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std::io::Result<usize> {
     let frame_definition = scope.frame_definition(&using.frame).unwrap_or_else(|| {
         panic!("Error: No frame '{}' found", using.frame);
     });
 
     let frame = Frame::from_definition(frame_definition, scope);
-    evaluate(output, &frame, 0, &using.block, scope)?;
-
-    Ok(())
+    evaluate(output, &frame, 0, &using.block, scope)
 }
 
 pub fn evaluate_program(output: &mut impl Write, program: &Program) -> std::io::Result<()> {
