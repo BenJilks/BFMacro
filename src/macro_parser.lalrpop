@@ -1,4 +1,5 @@
-use crate::ast::{Program, Variable, Definition, FrameDefinition, SlotDefinition, Macro, Using, Instruction};
+use crate::ast::{Program, Definition, FrameDefinition, SlotDefinition, Macro, Using};
+use crate::ast::{Variable, Argument, Instruction};
 
 grammar;
 
@@ -46,16 +47,21 @@ Instruction: Instruction = {
     "using" <frame: Identifier> "{" <block: Block> "}" => Instruction::Using(Using { frame, block }),
     <Variable> => Instruction::Variable(<>),
 
-    <name: Identifier> "(" <arguments: VariableList> ")" =>
+    <name: Identifier> "(" <arguments: ArgumentList> ")" =>
         Instruction::MacroInvoke(name, arguments),
 }
 
-VariableList: Vec<Variable> = {
-    <variables: (<Variable> ",")*> <last: Variable?> => {
-        let mut variables = variables;
-        variables.extend(last);
-        variables
+ArgumentList: Vec<Argument> = {
+    <arguments: (<Argument> ",")*> <last: Argument?> => {
+        let mut arguments = arguments;
+        arguments.extend(last);
+        arguments
     }
+}
+
+Argument: Argument = {
+    <Variable> => Argument::Variable(<>),
+    "{" <Block> "}" => Argument::Block(<>),
 }
 
 Variable: Variable = {

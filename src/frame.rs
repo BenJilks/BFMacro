@@ -1,11 +1,17 @@
-use crate::ast::{FrameDefinition, SlotDefinition, Variable};
+use crate::ast::{Argument, FrameDefinition, Instruction, SlotDefinition};
 use crate::scope::Scope;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Frame {
     pub name: String,
-    slots: HashMap<String, Slot>,
+    symbols: HashMap<String, Symbol>,
+}
+
+#[derive(Debug, Clone)]
+enum Symbol {
+    Slot(Slot),
+    Block(Vec<Instruction>, Frame),
 }
 
 #[derive(Debug, Clone)]
@@ -14,19 +20,24 @@ struct Slot {
     sub_frame: Option<Frame>,
 }
 
+pub enum Lookup {
+    Slot(usize),
+    Block(Vec<Instruction>, Frame),
+}
+
 impl Frame {
     pub fn from_definition(definition: &FrameDefinition, scope: &Scope) -> Self {
-        let mut slots = HashMap::new();
+        let mut symbols = HashMap::new();
         let mut index = 0;
         for slot in &definition.slots {
             match slot {
                 SlotDefinition::Variable(name) => {
-                    slots.insert(
+                    symbols.insert(
                         name.clone(),
-                        Slot {
+                        Symbol::Slot(Slot {
                             index,
                             sub_frame: None,
-                        },
+                        }),
                     );
 
                     index += 1;
@@ -41,12 +52,12 @@ impl Frame {
                     // TODO: Detect cycles.
                     let sub_frame = Frame::from_definition(sub_frame_definition, scope);
                     let sub_frame_size = sub_frame.size();
-                    slots.insert(
+                    symbols.insert(
                         name.clone(),
-                        Slot {
+                        Symbol::Slot(Slot {
                             index,
                             sub_frame: Some(sub_frame),
-                        },
+                        }),
                     );
 
                     index += sub_frame_size;
@@ -56,60 +67,86 @@ impl Frame {
 
         Self {
             name: definition.name.clone(),
-            slots,
+            symbols,
         }
     }
 
-    pub fn macro_frame(&self, parameters: &[String], arguments: &[Variable]) -> Self {
-        let mut slots = HashMap::new();
-        for (name, variable) in parameters.iter().zip(arguments) {
-            let (slot, index) = self.get(variable).unwrap_or_else(|| {
-                panic!("Error: No variable '{variable:?}' in frame '{}'", self.name);
-            });
+    pub fn macro_frame(&self, parameters: &[String], arguments: &[Argument]) -> Self {
+        let mut symbols = HashMap::new();
+        for (name, argument) in parameters.iter().zip(arguments) {
+            match argument {
+                Argument::Variable(variable) => {
+                    let (slot, index) = self.slot(variable).unwrap_or_else(|| {
+                        panic!("Error: No variable '{variable:?}' in frame '{}'", self.name);
+                    });
 
-            slots.insert(
-                name.clone(),
-                Slot {
-                    index,
-                    sub_frame: slot.sub_frame.clone(),
-                },
-            );
+                    symbols.insert(
+                        name.clone(),
+                        Symbol::Slot(Slot {
+                            index,
+                            sub_frame: slot.sub_frame.clone(),
+                        }),
+                    );
+                }
+
+                Argument::Block(block) => {
+                    symbols.insert(name.clone(), Symbol::Block(block.clone(), self.clone()));
+                }
+            }
         }
 
         Self {
             name: self.name.clone(),
-            slots,
+            symbols,
         }
     }
 
-    fn get(&self, path: &[String]) -> Option<(&Slot, usize)> {
+    fn slot(&self, path: &[String]) -> Option<(&Slot, usize)> {
         let name = &path[0];
-        let slot = self.slots.get(name)?;
-        if path.len() > 1 {
-            let sub_frame = slot
-                .sub_frame
-                .as_ref()
-                .expect("Must be a sub frame to use `.`");
-            let (sub_slot, sub_index) = sub_frame.get(&path[1..])?;
-            Some((sub_slot, slot.index + sub_index))
+        let symbol = self.symbols.get(name)?;
+        if let Symbol::Slot(slot) = symbol {
+            if path.len() > 1 {
+                let sub_frame = slot
+                    .sub_frame
+                    .as_ref()
+                    .expect("Must be a sub frame to use `.`");
+                let (sub_slot, sub_index) = sub_frame.slot(&path[1..])?;
+                Some((sub_slot, slot.index + sub_index))
+            } else {
+                Some((slot, slot.index))
+            }
         } else {
-            Some((slot, slot.index))
+            panic!("Expected {path:?} to be a slot");
         }
     }
 
-    pub fn offset(&self, path: &[String]) -> Option<usize> {
-        let (_, index) = self.get(path)?;
-        Some(index)
+    pub fn lookup(&self, path: &[String]) -> Option<Lookup> {
+        if path.len() == 0 {
+            return None;
+        }
+
+        let symbol = self.symbols.get(&path[0])?;
+        Some(match symbol {
+            Symbol::Block(block, frame) => Lookup::Block(block.clone(), frame.clone()),
+            Symbol::Slot(_) => {
+                let (_, index) = self.slot(path)?;
+                Lookup::Slot(index)
+            }
+        })
     }
 
     pub fn size(&self) -> usize {
-        self.slots
+        self.symbols
             .iter()
-            .map(|(_, slot)| {
-                if let Some(frame) = &slot.sub_frame {
-                    slot.index + frame.size()
+            .map(|(_, symbol)| {
+                if let Symbol::Slot(slot) = symbol {
+                    if let Some(frame) = &slot.sub_frame {
+                        slot.index + frame.size()
+                    } else {
+                        slot.index + 1
+                    }
                 } else {
-                    slot.index + 1
+                    0
                 }
             })
             .max()

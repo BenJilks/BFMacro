@@ -1,5 +1,5 @@
 use crate::ast::{Definition, Instruction, Program, Using};
-use crate::frame::Frame;
+use crate::frame::{Frame, Lookup};
 use crate::scope::Scope;
 use std::io::Write;
 
@@ -71,21 +71,27 @@ fn evaluate(
             }
 
             Instruction::Variable(name) => {
-                let offset = frame.offset(name).unwrap_or_else(|| {
-                    panic!("Error: No variable '{name:?}' in frame '{}'", frame.name);
-                });
+                match frame.lookup(name) {
+                    Some(Lookup::Slot(offset)) => {
+                        if offset > frame_offset {
+                            for _ in frame_offset..offset {
+                                write!(output, ">")?;
+                            }
+                        } else if offset < frame_offset {
+                            for _ in offset..frame_offset {
+                                write!(output, "<")?;
+                            }
+                        }
 
-                if offset > frame_offset {
-                    for _ in frame_offset..offset {
-                        write!(output, ">")?;
+                        frame_offset = offset;
                     }
-                } else if offset < frame_offset {
-                    for _ in offset..frame_offset {
-                        write!(output, "<")?;
-                    }
-                }
 
-                frame_offset = offset;
+                    Some(Lookup::Block(block, frame)) => {
+                        frame_offset = evaluate(output, &frame, frame_offset, &block, scope)?;
+                    }
+
+                    None => panic!("Error: Not symbol '{name:?}' found"),
+                };
             }
 
             Instruction::MacroInvoke(name, arguments) => {

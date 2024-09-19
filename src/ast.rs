@@ -47,5 +47,11 @@ pub enum Instruction {
     MovingBlock(Vec<Instruction>),
     Using(Using),
     Variable(Variable),
-    MacroInvoke(String, Vec<Variable>),
+    MacroInvoke(String, Vec<Argument>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Argument {
+    Variable(Variable),
+    Block(Vec<Instruction>),
 }
