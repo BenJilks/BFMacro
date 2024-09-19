@@ -5,6 +5,9 @@ grammar;
 pub Program: Program = (<Definition>)*;
 
 Definition: Definition = {
+    "include" <String> =>
+        Definition::Include(<>),
+
     "frame" <name: Identifier> "{" <slots: (<Slot>)*> "}" =>
         Definition::Frame(FrameDefinition { name, slots }),
 
@@ -64,3 +67,4 @@ Variable: Variable = {
 }
 
 Identifier: String = <s:r"[a-zA-Z_][a-zA-Z0-9_]*"> => s.to_owned();
+String: String = <s:r#""[^"]*""#> => s[1..s.len()-1].to_owned();

@@ -3,6 +3,7 @@ pub type Variable = Vec<String>;
 
 #[derive(Debug, Clone)]
 pub enum Definition {
+    Include(String),
     Frame(FrameDefinition),
     Macro(Macro),
     Using(Using),

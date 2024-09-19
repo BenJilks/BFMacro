@@ -1,7 +1,6 @@
 use crate::ast::{FrameDefinition, SlotDefinition, Variable};
 use crate::scope::Scope;
 use std::collections::HashMap;
-use std::process::exit;
 
 #[derive(Debug, Clone)]
 pub struct Frame {
@@ -36,8 +35,7 @@ impl Frame {
                 SlotDefinition::SubFrame(name, frame) => {
                     let sub_frame_definition =
                         scope.frame_definition(&frame).unwrap_or_else(|| {
-                            println!("Error: No frame '{frame}' found");
-                            exit(1);
+                            panic!("Error: No frame '{frame}' found");
                         });
 
                     // TODO: Detect cycles.
@@ -66,8 +64,7 @@ impl Frame {
         let mut slots = HashMap::new();
         for (name, variable) in parameters.iter().zip(arguments) {
             let (slot, index) = self.get(variable).unwrap_or_else(|| {
-                println!("Error: No variable '{variable:?}' in frame '{}'", self.name);
-                exit(1);
+                panic!("Error: No variable '{variable:?}' in frame '{}'", self.name);
             });
 
             slots.insert(

@@ -2,7 +2,6 @@ use crate::ast::{Definition, Instruction, Program, Using};
 use crate::frame::Frame;
 use crate::scope::Scope;
 use std::io::Write;
-use std::process::exit;
 
 fn evaluate_moving_block(
     output: &mut impl Write,
@@ -73,8 +72,7 @@ fn evaluate(
 
             Instruction::Variable(name) => {
                 let offset = frame.offset(name).unwrap_or_else(|| {
-                    println!("Error: No variable '{name:?}' in frame '{}'", frame.name);
-                    exit(1);
+                    panic!("Error: No variable '{name:?}' in frame '{}'", frame.name);
                 });
 
                 if offset > frame_offset {
@@ -92,8 +90,7 @@ fn evaluate(
 
             Instruction::MacroInvoke(name, arguments) => {
                 let marco_ = scope.macro_(name).unwrap_or_else(|| {
-                    println!("No macro '{name}' found");
-                    exit(1);
+                    panic!("No macro '{name}' found");
                 });
 
                 let frame = frame.macro_frame(&marco_.parameters, &arguments);
@@ -107,8 +104,7 @@ fn evaluate(
 
 fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std::io::Result<()> {
     let frame_definition = scope.frame_definition(&using.frame).unwrap_or_else(|| {
-        println!("Error: No frame '{}' found", using.frame);
-        exit(1);
+        panic!("Error: No frame '{}' found", using.frame);
     });
 
     let frame = Frame::from_definition(frame_definition, scope);
@@ -118,7 +114,7 @@ fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std:
 }
 
 pub fn evaluate_program(output: &mut impl Write, program: &Program) -> std::io::Result<()> {
-    let scope = Scope::new(program);
+    let scope = Scope::new(program)?;
     for definition in program {
         if let Definition::Using(using) = definition {
             evaluate_using(output, &using, &scope)?;
