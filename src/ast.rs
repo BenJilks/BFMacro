@@ -1,4 +1,5 @@
 pub type Program = Vec<Definition>;
+pub type Variable = Vec<String>;
 
 #[derive(Debug, Clone)]
 pub enum Definition {
@@ -42,6 +43,6 @@ pub enum Instruction {
     Output,
     OpenLoop,
     CloseLoop,
-    Variable(String),
-    MacroInvoke(String, Vec<String>),
+    Variable(Variable),
+    MacroInvoke(String, Vec<Variable>),
 }

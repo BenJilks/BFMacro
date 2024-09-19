@@ -1,4 +1,4 @@
-use crate::ast::{Program, Definition, FrameDefinition, SlotDefinition, Macro, Using, Instruction};
+use crate::ast::{Program, Variable, Definition, FrameDefinition, SlotDefinition, Macro, Using, Instruction};
 
 grammar;
 
@@ -8,11 +8,19 @@ Definition: Definition = {
     "frame" <name: Identifier> "{" <slots: (<Slot>)*> "}" =>
         Definition::Frame(FrameDefinition { name, slots }),
 
-    "macro" <name: Identifier> "(" <parameters: VariableList> ")" "{" <block: Block> "}" =>
+    "macro" <name: Identifier> "(" <parameters: ParameterList> ")" "{" <block: Block> "}" =>
         Definition::Macro(Macro { name, parameters, block }),
 
     "using" <frame: Identifier> "{" <block: Block> "}" => 
         Definition::Using(Using { frame, block }),
+}
+
+ParameterList: Vec<String> = {
+    <parameters: (<Identifier> ",")*> <last: Identifier?> => {
+        let mut parameters = parameters;
+        parameters.extend(last);
+        parameters
+    }
 }
 
 Slot: SlotDefinition = {
@@ -28,21 +36,29 @@ Instruction: Instruction = {
     "<" => Instruction::Left,
     ">" => Instruction::Right,
     "," => Instruction::Input,
-    "." => Instruction::Output,
+    "@" => Instruction::Output,
     "[" => Instruction::OpenLoop,
     "]" => Instruction::CloseLoop,
-    <Identifier> => Instruction::Variable(<>),
+    <Variable> => Instruction::Variable(<>),
 
     <name: Identifier> "(" <arguments: VariableList> ")" =>
         Instruction::MacroInvoke(name, arguments),
 }
 
-VariableList: Vec<String> = {
-    <variables: (<Identifier> ",")*> <last: Identifier?> => {
+VariableList: Vec<Variable> = {
+    <variables: (<Variable> ",")*> <last: Variable?> => {
         let mut variables = variables;
         variables.extend(last);
         variables
     }
+}
+
+Variable: Variable = {
+    <first: Identifier> <path: ("." <Identifier>)*> => {
+        let mut path = path;
+        path.insert(0, first);
+        path
+    },
 }
 
 Identifier: String = <s:r"[a-zA-Z_][a-zA-Z0-9_]*"> => s.to_owned();

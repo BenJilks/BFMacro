@@ -1,15 +1,15 @@
-use crate::ast::{FrameDefinition, SlotDefinition};
+use crate::ast::{FrameDefinition, SlotDefinition, Variable};
 use crate::scope::Scope;
 use std::collections::HashMap;
 use std::process::exit;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pub name: String,
     slots: HashMap<String, Slot>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct Slot {
     index: usize,
     sub_frame: Option<Frame>,
@@ -62,15 +62,21 @@ impl Frame {
         }
     }
 
-    pub fn macro_frame(&self, parameters: &[String], arguments: &[String]) -> Self {
+    pub fn macro_frame(&self, parameters: &[String], arguments: &[Variable]) -> Self {
         let mut slots = HashMap::new();
         for (name, variable) in parameters.iter().zip(arguments) {
-            let slot = self.slots.get(variable).unwrap_or_else(|| {
-                println!("Error: No variable '{variable}' in frame '{}'", self.name);
+            let (slot, index) = self.get(variable).unwrap_or_else(|| {
+                println!("Error: No variable '{variable:?}' in frame '{}'", self.name);
                 exit(1);
             });
 
-            slots.insert(name.clone(), slot.clone());
+            slots.insert(
+                name.clone(),
+                Slot {
+                    index,
+                    sub_frame: slot.sub_frame.clone(),
+                },
+            );
         }
 
         Self {
@@ -79,8 +85,24 @@ impl Frame {
         }
     }
 
-    pub fn offset(&self, name: &str) -> Option<usize> {
-        self.slots.get(name).map(|slot| slot.index)
+    fn get(&self, path: &[String]) -> Option<(&Slot, usize)> {
+        let name = &path[0];
+        let slot = self.slots.get(name)?;
+        if path.len() > 1 {
+            let sub_frame = slot
+                .sub_frame
+                .as_ref()
+                .expect("Must be a sub frame to use `.`");
+            let (sub_slot, sub_index) = sub_frame.get(&path[1..])?;
+            Some((sub_slot, slot.index + sub_index))
+        } else {
+            Some((slot, slot.index))
+        }
+    }
+
+    pub fn offset(&self, path: &[String]) -> Option<usize> {
+        let (_, index) = self.get(path)?;
+        Some(index)
     }
 
     pub fn size(&self) -> usize {

@@ -10,7 +10,7 @@ fn evaluate(
     frame_offset: usize,
     program: &Vec<Instruction>,
     scope: &Scope,
-) -> std::io::Result<()> {
+) -> std::io::Result<usize> {
     let mut frame_offset = frame_offset;
 
     for instruction in program {
@@ -26,7 +26,7 @@ fn evaluate(
 
             Instruction::Variable(name) => {
                 let offset = frame.offset(name).unwrap_or_else(|| {
-                    println!("Error: No variable '{name}' in frame '{}'", frame.name);
+                    println!("Error: No variable '{name:?}' in frame '{}'", frame.name);
                     exit(1);
                 });
 
@@ -50,12 +50,12 @@ fn evaluate(
                 });
 
                 let frame = frame.macro_frame(&marco_.parameters, &arguments);
-                evaluate(output, &frame, frame_offset, &marco_.block, scope)?;
+                frame_offset = evaluate(output, &frame, frame_offset, &marco_.block, scope)?;
             }
         }
     }
 
-    Ok(())
+    Ok(frame_offset)
 }
 
 fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std::io::Result<()> {
@@ -65,7 +65,9 @@ fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std:
     });
 
     let frame = Frame::from_definition(frame_definition, scope);
-    evaluate(output, &frame, 0, &using.block, scope)
+    evaluate(output, &frame, 0, &using.block, scope)?;
+
+    Ok(())
 }
 
 pub fn evaluate_program(output: &mut impl Write, program: &Program) -> std::io::Result<()> {
