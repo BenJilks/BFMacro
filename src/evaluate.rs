@@ -1,14 +1,15 @@
-use crate::ast::{Definition, Instruction, Program, Using};
+use crate::ast::{Block, Definition, Instruction, Program, Using};
+use crate::error::{display_error_message, variable_span, variable_string};
 use crate::frame::{Frame, Lookup};
 use crate::scope::Scope;
 use std::io::Write;
 
 fn evaluate_moving_block(
     output: &mut impl Write,
-    block: &Vec<Instruction>,
+    block: &Block,
     scope: &Scope,
 ) -> std::io::Result<()> {
-    for instruction in block {
+    for instruction in &block.instructions {
         match instruction {
             Instruction::Add => write!(output, "+")?,
             Instruction::Subtract => write!(output, "-")?,
@@ -44,12 +45,12 @@ fn evaluate(
     output: &mut impl Write,
     frame: &Frame,
     frame_offset: usize,
-    block: &Vec<Instruction>,
+    block: &Block,
     scope: &Scope,
 ) -> std::io::Result<usize> {
     let mut frame_offset = frame_offset;
 
-    for instruction in block {
+    for instruction in &block.instructions {
         match instruction {
             Instruction::Add => write!(output, "+")?,
             Instruction::Subtract => write!(output, "-")?,
@@ -70,8 +71,8 @@ fn evaluate(
                 frame_offset += evaluate_using(output, using, scope)?;
             }
 
-            Instruction::Variable(name) => {
-                match frame.lookup(name) {
+            Instruction::Variable(variable) => {
+                match frame.lookup(&variable) {
                     Some(Lookup::Slot(offset)) => {
                         if offset > frame_offset {
                             for _ in frame_offset..offset {
@@ -90,13 +91,17 @@ fn evaluate(
                         frame_offset = evaluate(output, &frame, frame_offset, &block, scope)?;
                     }
 
-                    None => panic!("Error: Not symbol '{name:?}' found"),
+                    None => display_error_message(
+                        &block.file_path,
+                        variable_span(variable),
+                        format!("Not symbol '{}' found", variable_string(variable)),
+                    ),
                 };
             }
 
             Instruction::MacroInvoke(name, arguments) => {
-                let marco_ = scope.macro_(name).unwrap_or_else(|| {
-                    panic!("No macro '{name}' found");
+                let marco_ = scope.macro_(&name.value).unwrap_or_else(|| {
+                    panic!("No macro '{}' found", name.value);
                 });
 
                 let frame = frame.macro_frame(&marco_.parameters, &arguments);
@@ -109,9 +114,11 @@ fn evaluate(
 }
 
 fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std::io::Result<usize> {
-    let frame_definition = scope.frame_definition(&using.frame).unwrap_or_else(|| {
-        panic!("Error: No frame '{}' found", using.frame);
-    });
+    let frame_definition = scope
+        .frame_definition(&using.frame.value)
+        .unwrap_or_else(|| {
+            panic!("Error: No frame '{}' found", using.frame.value);
+        });
 
     let frame = Frame::from_definition(frame_definition, scope);
     evaluate(output, &frame, 0, &using.block, scope)
@@ -121,7 +128,7 @@ pub fn evaluate_program(output: &mut impl Write, program: &Program) -> std::io::
     let scope = Scope::new(program)?;
     for definition in program {
         if let Definition::Using(using) = definition {
-            evaluate_using(output, &using, &scope)?;
+            evaluate_using(output, using, &scope)?;
         }
     }
 

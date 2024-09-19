@@ -1,5 +1,5 @@
 pub type Program = Vec<Definition>;
-pub type Variable = Vec<String>;
+pub type Variable = Vec<Identifier>;
 
 #[derive(Debug, Clone)]
 pub enum Definition {
@@ -11,27 +11,27 @@ pub enum Definition {
 
 #[derive(Debug, Clone)]
 pub struct FrameDefinition {
-    pub name: String,
+    pub name: Identifier,
     pub slots: Vec<SlotDefinition>,
 }
 
 #[derive(Debug, Clone)]
 pub enum SlotDefinition {
-    Variable(String),
-    SubFrame(String, String),
+    Variable(Identifier),
+    SubFrame(Identifier, Identifier),
 }
 
 #[derive(Debug, Clone)]
 pub struct Macro {
-    pub name: String,
-    pub parameters: Vec<String>,
-    pub block: Vec<Instruction>,
+    pub name: Identifier,
+    pub parameters: Vec<Identifier>,
+    pub block: Block,
 }
 
 #[derive(Debug, Clone)]
 pub struct Using {
-    pub frame: String,
-    pub block: Vec<Instruction>,
+    pub frame: Identifier,
+    pub block: Block,
 }
 
 #[derive(Debug, Clone)]
@@ -44,14 +44,64 @@ pub enum Instruction {
     Output,
     OpenLoop,
     CloseLoop,
-    MovingBlock(Vec<Instruction>),
+    MovingBlock(Block),
     Using(Using),
     Variable(Variable),
-    MacroInvoke(String, Vec<Argument>),
+    MacroInvoke(Identifier, Vec<Argument>),
 }
 
 #[derive(Debug, Clone)]
 pub enum Argument {
     Variable(Variable),
-    Block(Vec<Instruction>),
+    Block(Block),
+}
+
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub instructions: Vec<Instruction>,
+    pub file_path: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Identifier {
+    pub value: String,
+    pub span: Span,
+}
+
+pub type Span = (usize, usize);
+
+fn set_block_file_path(block: &mut Block, file_path: &str) {
+    block.file_path = Some(file_path.to_owned());
+    for instruction in &mut block.instructions {
+        match instruction {
+            Instruction::MovingBlock(block) => {
+                set_block_file_path(block, file_path);
+            }
+            Instruction::Using(using) => {
+                set_block_file_path(&mut using.block, file_path);
+            }
+            Instruction::MacroInvoke(_, arguments) => {
+                for argument in arguments {
+                    if let Argument::Block(block) = argument {
+                        set_block_file_path(block, file_path);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+pub fn set_program_file_path(program: &mut Program, file_path: &str) {
+    for definition in program {
+        match definition {
+            Definition::Macro(macro_) => {
+                set_block_file_path(&mut macro_.block, file_path);
+            }
+            Definition::Using(using) => {
+                set_block_file_path(&mut using.block, file_path);
+            }
+            _ => {}
+        }
+    }
 }

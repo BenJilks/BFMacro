@@ -1,5 +1,6 @@
 use crate::ast::{Program, Definition, FrameDefinition, SlotDefinition, Macro, Using};
-use crate::ast::{Variable, Argument, Instruction};
+use crate::ast::{Variable, Argument, Block, Instruction};
+use crate::ast::Identifier;
 
 grammar;
 
@@ -19,7 +20,7 @@ Definition: Definition = {
         Definition::Using(Using { frame, block }),
 }
 
-ParameterList: Vec<String> = {
+ParameterList: Vec<Identifier> = {
     <parameters: (<Identifier> ",")*> <last: Identifier?> => {
         let mut parameters = parameters;
         parameters.extend(last);
@@ -32,7 +33,9 @@ Slot: SlotDefinition = {
     <name: Identifier> ":" <frame: Identifier> => SlotDefinition::SubFrame(name, frame),
 }
 
-Block = (<Instruction>)*;
+Block: Block = {
+    (<Instruction>)* => Block { instructions: <>, file_path: None },
+}
 
 Instruction: Instruction = {
     "+" => Instruction::Add,
@@ -72,5 +75,13 @@ Variable: Variable = {
     },
 }
 
-Identifier: String = <s:r"[a-zA-Z_][a-zA-Z0-9_]*"> => s.to_owned();
+Identifier: Identifier = {
+    <l: @L> <s:r"[a-zA-Z_][a-zA-Z0-9_]*"> <r: @R> => {
+        Identifier {
+            value: s.to_owned(),
+            span: (l, r),
+        }
+    },
+}
+
 String: String = <s:r#""[^"]*""#> => s[1..s.len()-1].to_owned();

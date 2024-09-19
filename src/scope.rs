@@ -1,4 +1,4 @@
-use crate::ast::{Definition, FrameDefinition, Macro, Program};
+use crate::ast::{set_program_file_path, Definition, FrameDefinition, Macro, Program};
 use crate::macro_parser;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -35,27 +35,29 @@ impl Scope {
                     file.read_to_string(&mut script)?;
 
                     let parser = macro_parser::ProgramParser::new();
-                    let program = parser.parse(&script).unwrap();
+                    let mut program = parser.parse(&script).unwrap();
+                    set_program_file_path(&mut program, file_path);
 
                     self.includes.insert(file_path.clone());
                     self.add_program(&program)?;
                 }
 
                 Definition::Frame(frame) => {
-                    if self.frame_definitions.contains_key(&frame.name) {
-                        panic!("Multiple definitions of {}", frame.name);
+                    if self.frame_definitions.contains_key(&frame.name.value) {
+                        panic!("Multiple definitions of {}", frame.name.value);
                     }
 
                     self.frame_definitions
-                        .insert(frame.name.clone(), frame.clone());
+                        .insert(frame.name.value.clone(), frame.clone());
                 }
 
                 Definition::Macro(macro_) => {
-                    if self.macros.contains_key(&macro_.name) {
-                        panic!("Multiple definitions of {}", macro_.name);
+                    if self.macros.contains_key(&macro_.name.value) {
+                        panic!("Multiple definitions of {}", macro_.name.value);
                     }
 
-                    self.macros.insert(macro_.name.clone(), macro_.clone());
+                    self.macros
+                        .insert(macro_.name.value.clone(), macro_.clone());
                 }
 
                 _ => {}

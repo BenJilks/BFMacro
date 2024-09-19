@@ -1,8 +1,10 @@
 mod ast;
+mod error;
 mod evaluate;
 mod frame;
 mod scope;
 
+use ast::set_program_file_path;
 use evaluate::evaluate_program;
 use std::error::Error;
 use std::fs::File;
@@ -17,7 +19,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     file.read_to_string(&mut script)?;
 
     let parser = macro_parser::ProgramParser::new();
-    let program = parser.parse(&script).unwrap();
+    let mut program = parser.parse(&script).unwrap();
+    set_program_file_path(&mut program, "test.bfm");
+
     evaluate_program(&mut stdout(), &program)?;
     println!();
 

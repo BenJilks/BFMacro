@@ -1,4 +1,4 @@
-use crate::ast::{Argument, FrameDefinition, Instruction, SlotDefinition};
+use crate::ast::{Argument, Block, FrameDefinition, Identifier, SlotDefinition};
 use crate::scope::Scope;
 use std::collections::HashMap;
 
@@ -11,7 +11,7 @@ pub struct Frame {
 #[derive(Debug, Clone)]
 enum Symbol {
     Slot(Slot),
-    Block(Vec<Instruction>, Frame),
+    Block(Block, Frame),
 }
 
 #[derive(Debug, Clone)]
@@ -22,7 +22,7 @@ struct Slot {
 
 pub enum Lookup {
     Slot(usize),
-    Block(Vec<Instruction>, Frame),
+    Block(Block, Frame),
 }
 
 impl Frame {
@@ -33,7 +33,7 @@ impl Frame {
             match slot {
                 SlotDefinition::Variable(name) => {
                     symbols.insert(
-                        name.clone(),
+                        name.value.clone(),
                         Symbol::Slot(Slot {
                             index,
                             sub_frame: None,
@@ -45,15 +45,15 @@ impl Frame {
 
                 SlotDefinition::SubFrame(name, frame) => {
                     let sub_frame_definition =
-                        scope.frame_definition(&frame).unwrap_or_else(|| {
-                            panic!("Error: No frame '{frame}' found");
+                        scope.frame_definition(&frame.value).unwrap_or_else(|| {
+                            panic!("Error: No frame '{}' found", frame.value);
                         });
 
                     // TODO: Detect cycles.
                     let sub_frame = Frame::from_definition(sub_frame_definition, scope);
                     let sub_frame_size = sub_frame.size();
                     symbols.insert(
-                        name.clone(),
+                        name.value.clone(),
                         Symbol::Slot(Slot {
                             index,
                             sub_frame: Some(sub_frame),
@@ -66,12 +66,12 @@ impl Frame {
         }
 
         Self {
-            name: definition.name.clone(),
+            name: definition.name.value.clone(),
             symbols,
         }
     }
 
-    pub fn macro_frame(&self, parameters: &[String], arguments: &[Argument]) -> Self {
+    pub fn macro_frame(&self, parameters: &[Identifier], arguments: &[Argument]) -> Self {
         let mut symbols = HashMap::new();
         for (name, argument) in parameters.iter().zip(arguments) {
             match argument {
@@ -81,7 +81,7 @@ impl Frame {
                     });
 
                     symbols.insert(
-                        name.clone(),
+                        name.value.clone(),
                         Symbol::Slot(Slot {
                             index,
                             sub_frame: slot.sub_frame.clone(),
@@ -90,7 +90,10 @@ impl Frame {
                 }
 
                 Argument::Block(block) => {
-                    symbols.insert(name.clone(), Symbol::Block(block.clone(), self.clone()));
+                    symbols.insert(
+                        name.value.clone(),
+                        Symbol::Block(block.clone(), self.clone()),
+                    );
                 }
             }
         }
@@ -101,9 +104,12 @@ impl Frame {
         }
     }
 
-    fn slot(&self, path: &[String]) -> Option<(&Slot, usize)> {
-        let name = &path[0];
-        let symbol = self.symbols.get(name)?;
+    fn slot(&self, path: &[Identifier]) -> Option<(&Slot, usize)> {
+        if path.len() == 0 {
+            return None;
+        }
+
+        let symbol = self.symbols.get(&path[0].value)?;
         if let Symbol::Slot(slot) = symbol {
             if path.len() > 1 {
                 let sub_frame = slot
@@ -120,12 +126,12 @@ impl Frame {
         }
     }
 
-    pub fn lookup(&self, path: &[String]) -> Option<Lookup> {
+    pub fn lookup(&self, path: &[Identifier]) -> Option<Lookup> {
         if path.len() == 0 {
             return None;
         }
 
-        let symbol = self.symbols.get(&path[0])?;
+        let symbol = self.symbols.get(&path[0].value)?;
         Some(match symbol {
             Symbol::Block(block, frame) => Lookup::Block(block.clone(), frame.clone()),
             Symbol::Slot(_) => {
