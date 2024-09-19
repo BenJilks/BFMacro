@@ -4,16 +4,12 @@ use crate::scope::Scope;
 use std::io::Write;
 use std::process::exit;
 
-fn evaluate(
+fn evaluate_moving_block(
     output: &mut impl Write,
-    frame: &Frame,
-    frame_offset: usize,
-    program: &Vec<Instruction>,
+    block: &Vec<Instruction>,
     scope: &Scope,
-) -> std::io::Result<usize> {
-    let mut frame_offset = frame_offset;
-
-    for instruction in program {
+) -> std::io::Result<()> {
+    for instruction in block {
         match instruction {
             Instruction::Add => write!(output, "+")?,
             Instruction::Subtract => write!(output, "-")?,
@@ -23,6 +19,57 @@ fn evaluate(
             Instruction::Output => write!(output, ".")?,
             Instruction::OpenLoop => write!(output, "[")?,
             Instruction::CloseLoop => write!(output, "]")?,
+
+            Instruction::MovingBlock(block) => {
+                evaluate_moving_block(output, block, scope)?;
+            }
+
+            Instruction::Using(using) => {
+                evaluate_using(output, using, scope)?;
+            }
+
+            Instruction::Variable(_) => {
+                panic!("Cannot access variables from inside a moving block")
+            }
+
+            Instruction::MacroInvoke(_, _) => {
+                panic!("Cannot access macros from inside a moving block")
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn evaluate(
+    output: &mut impl Write,
+    frame: &Frame,
+    frame_offset: usize,
+    block: &Vec<Instruction>,
+    scope: &Scope,
+) -> std::io::Result<usize> {
+    let mut frame_offset = frame_offset;
+
+    for instruction in block {
+        match instruction {
+            Instruction::Add => write!(output, "+")?,
+            Instruction::Subtract => write!(output, "-")?,
+            Instruction::Input => write!(output, ",")?,
+            Instruction::Output => write!(output, ".")?,
+            Instruction::OpenLoop => write!(output, "[")?,
+            Instruction::CloseLoop => write!(output, "]")?,
+
+            Instruction::Left | Instruction::Right => {
+                panic!("Can only use manual pointer movement inside a moving block")
+            }
+
+            Instruction::MovingBlock(block) => {
+                evaluate_moving_block(output, block, scope)?;
+            }
+
+            Instruction::Using(using) => {
+                evaluate_using(output, using, scope)?;
+            }
 
             Instruction::Variable(name) => {
                 let offset = frame.offset(name).unwrap_or_else(|| {

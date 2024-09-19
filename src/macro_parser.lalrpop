@@ -39,6 +39,8 @@ Instruction: Instruction = {
     "@" => Instruction::Output,
     "[" => Instruction::OpenLoop,
     "]" => Instruction::CloseLoop,
+    "moving" "{" <Block> "}" => Instruction::MovingBlock(<>),
+    "using" <frame: Identifier> "{" <block: Block> "}" => Instruction::Using(Using { frame, block }),
     <Variable> => Instruction::Variable(<>),
 
     <name: Identifier> "(" <arguments: VariableList> ")" =>

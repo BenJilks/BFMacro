@@ -43,6 +43,8 @@ pub enum Instruction {
     Output,
     OpenLoop,
     CloseLoop,
+    MovingBlock(Vec<Instruction>),
+    Using(Using),
     Variable(Variable),
     MacroInvoke(String, Vec<Variable>),
 }
