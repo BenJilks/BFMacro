@@ -38,8 +38,8 @@ pub struct Using {
 pub enum Instruction {
     Add,
     Subtract,
-    Left,
-    Right,
+    Left(Span),
+    Right(Span),
     Input,
     Output,
     OpenLoop,

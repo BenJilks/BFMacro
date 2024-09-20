@@ -1,5 +1,5 @@
 use crate::ast::{Block, Definition, Instruction, Program, Using};
-use crate::error::{display_error_message, variable_span, variable_string};
+use crate::error::{display_error_message, variable_span, Error};
 use crate::frame::{Frame, Lookup};
 use crate::scope::Scope;
 use std::io::Write;
@@ -13,8 +13,8 @@ fn evaluate_moving_block(
         match instruction {
             Instruction::Add => write!(output, "+")?,
             Instruction::Subtract => write!(output, "-")?,
-            Instruction::Left => write!(output, "<")?,
-            Instruction::Right => write!(output, ">")?,
+            Instruction::Left(_) => write!(output, "<")?,
+            Instruction::Right(_) => write!(output, ">")?,
             Instruction::Input => write!(output, ",")?,
             Instruction::Output => write!(output, ".")?,
             Instruction::OpenLoop => write!(output, "[")?,
@@ -28,12 +28,24 @@ fn evaluate_moving_block(
                 evaluate_using(output, using, scope)?;
             }
 
-            Instruction::Variable(_) => {
-                panic!("Cannot access variables from inside a moving block")
+            Instruction::Variable(variable) => {
+                display_error_message(
+                    &block.file_path,
+                    Error {
+                        span: variable_span(variable),
+                        message: "Cannot access variables from inside a moving block".to_owned(),
+                    },
+                );
             }
 
-            Instruction::MacroInvoke(_, _) => {
-                panic!("Cannot access macros from inside a moving block")
+            Instruction::MacroInvoke(name, _) => {
+                display_error_message(
+                    &block.file_path,
+                    Error {
+                        span: name.span,
+                        message: "Cannot access macros from inside a moving block".to_owned(),
+                    },
+                );
             }
         }
     }
@@ -59,8 +71,15 @@ fn evaluate(
             Instruction::OpenLoop => write!(output, "[")?,
             Instruction::CloseLoop => write!(output, "]")?,
 
-            Instruction::Left | Instruction::Right => {
-                panic!("Can only use manual pointer movement inside a moving block")
+            Instruction::Left(span) | Instruction::Right(span) => {
+                display_error_message(
+                    &block.file_path,
+                    Error {
+                        span: span.clone(),
+                        message: "Can only use manual pointer movement inside a moving block"
+                            .to_owned(),
+                    },
+                );
             }
 
             Instruction::MovingBlock(block) => {
@@ -73,7 +92,7 @@ fn evaluate(
 
             Instruction::Variable(variable) => {
                 match frame.lookup(&variable) {
-                    Some(Lookup::Slot(offset)) => {
+                    Ok(Lookup::Slot(offset)) => {
                         if offset > frame_offset {
                             for _ in frame_offset..offset {
                                 write!(output, ">")?;
@@ -87,25 +106,36 @@ fn evaluate(
                         frame_offset = offset;
                     }
 
-                    Some(Lookup::Block(block, frame)) => {
+                    Ok(Lookup::Block(block, frame)) => {
                         frame_offset = evaluate(output, &frame, frame_offset, &block, scope)?;
                     }
 
-                    None => display_error_message(
-                        &block.file_path,
-                        variable_span(variable),
-                        format!("Not symbol '{}' found", variable_string(variable)),
-                    ),
+                    Err(err) => display_error_message(&block.file_path, err),
                 };
             }
 
             Instruction::MacroInvoke(name, arguments) => {
-                let marco_ = scope.macro_(&name.value).unwrap_or_else(|| {
-                    panic!("No macro '{}' found", name.value);
-                });
+                let macro_ = scope.macro_(&name.value);
+                if macro_.is_none() {
+                    display_error_message(
+                        &block.file_path,
+                        Error {
+                            span: name.span,
+                            message: format!("Error: No macro '{}' found", name.value),
+                        },
+                    );
+                    continue;
+                }
 
-                let frame = frame.macro_frame(&marco_.parameters, &arguments);
-                frame_offset = evaluate(output, &frame, frame_offset, &marco_.block, scope)?;
+                let macro_ = macro_.unwrap();
+                match frame.macro_frame(&macro_.parameters, &arguments) {
+                    Ok(frame) => {
+                        frame_offset =
+                            evaluate(output, &frame, frame_offset, &macro_.block, scope)?;
+                    }
+
+                    Err(err) => display_error_message(&block.file_path, err),
+                }
             }
         }
     }
@@ -114,13 +144,19 @@ fn evaluate(
 }
 
 fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std::io::Result<usize> {
-    let frame_definition = scope
-        .frame_definition(&using.frame.value)
-        .unwrap_or_else(|| {
-            panic!("Error: No frame '{}' found", using.frame.value);
-        });
+    let frame_definition = scope.frame_definition(&using.frame.value);
+    if frame_definition.is_none() {
+        display_error_message(
+            &using.block.file_path,
+            Error {
+                span: using.frame.span,
+                message: format!("Error: No frame '{}' found", using.frame.value),
+            },
+        );
+        return Ok(0);
+    }
 
-    let frame = Frame::from_definition(frame_definition, scope);
+    let frame = Frame::from_definition(frame_definition.unwrap(), scope);
     evaluate(output, &frame, 0, &using.block, scope)
 }
 

@@ -3,6 +3,12 @@ use std::io::Read;
 
 use crate::ast::{Span, Variable};
 
+pub type Result<T> = std::result::Result<T, Error>;
+pub struct Error {
+    pub span: Span,
+    pub message: String,
+}
+
 fn read_source(file_path: &str) -> std::io::Result<String> {
     let mut file = File::open(file_path)?;
     let mut source = String::new();
@@ -10,16 +16,16 @@ fn read_source(file_path: &str) -> std::io::Result<String> {
     Ok(source)
 }
 
-pub fn display_error_message(file_path: &Option<String>, span: Span, error_message: String) {
+pub fn display_error_message(file_path: &Option<String>, error: Error) {
     if file_path.is_none() {
-        println!("Error in unknown location: {error_message}");
+        println!("Error in unknown location: {}", error.message);
         return;
     }
 
     let file_path = file_path.as_ref().unwrap();
     let source = read_source(&file_path);
     if source.is_err() {
-        println!("Error in invalid file '{file_path}': {error_message}");
+        println!("Error in invalid file '{file_path}': {}", error.message);
     }
 
     let source = source.unwrap();
@@ -38,14 +44,14 @@ pub fn display_error_message(file_path: &Option<String>, span: Span, error_messa
             line_count += 1;
         }
 
-        if i >= span.0 {
+        if i >= error.span.0 {
             is_in_line = true;
         }
     }
 
     let line = &source[line_start..line_end];
     println!("\n{file_path}:{line_count} {line}");
-    println!("Error: {error_message}");
+    println!("Error: {}", error.message);
 }
 
 pub fn variable_span(variable: &Variable) -> Span {
@@ -54,12 +60,4 @@ pub fn variable_span(variable: &Variable) -> Span {
     let (start, _) = variable.first().unwrap().span;
     let (_, end) = variable.last().unwrap().span;
     (start, end)
-}
-
-pub fn variable_string(variable: &Variable) -> String {
-    variable
-        .iter()
-        .map(|x| x.value.clone())
-        .collect::<Vec<String>>()
-        .join(".")
 }

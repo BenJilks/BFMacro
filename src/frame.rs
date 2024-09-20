@@ -1,4 +1,5 @@
 use crate::ast::{Argument, Block, FrameDefinition, Identifier, SlotDefinition};
+use crate::error::{Error, Result};
 use crate::scope::Scope;
 use std::collections::HashMap;
 
@@ -71,15 +72,12 @@ impl Frame {
         }
     }
 
-    pub fn macro_frame(&self, parameters: &[Identifier], arguments: &[Argument]) -> Self {
+    pub fn macro_frame(&self, parameters: &[Identifier], arguments: &[Argument]) -> Result<Self> {
         let mut symbols = HashMap::new();
         for (name, argument) in parameters.iter().zip(arguments) {
             match argument {
                 Argument::Variable(variable) => {
-                    let (slot, index) = self.slot(variable).unwrap_or_else(|| {
-                        panic!("Error: No variable '{variable:?}' in frame '{}'", self.name);
-                    });
-
+                    let (slot, index) = self.slot(variable)?;
                     symbols.insert(
                         name.value.clone(),
                         Symbol::Slot(Slot {
@@ -98,41 +96,61 @@ impl Frame {
             }
         }
 
-        Self {
+        Ok(Self {
             name: self.name.clone(),
             symbols,
-        }
+        })
     }
 
-    fn slot(&self, path: &[Identifier]) -> Option<(&Slot, usize)> {
+    fn slot(&self, path: &[Identifier]) -> Result<(&Slot, usize)> {
         if path.len() == 0 {
-            return None;
+            panic!("Path must have at least one element");
         }
 
-        let symbol = self.symbols.get(&path[0].value)?;
+        let name = &path[0];
+        let symbol = self.symbols.get(&name.value).ok_or(Error {
+            span: name.span,
+            message: format!(
+                "No symbol with the name '{}' found in frame '{}'",
+                name.value, self.name
+            ),
+        })?;
+
         if let Symbol::Slot(slot) = symbol {
             if path.len() > 1 {
-                let sub_frame = slot
-                    .sub_frame
-                    .as_ref()
-                    .expect("Must be a sub frame to use `.`");
+                let sub_frame = slot.sub_frame.as_ref().ok_or(Error {
+                    span: name.span,
+                    message: "Must be a sub frame to use `.`".to_owned(),
+                })?;
+
                 let (sub_slot, sub_index) = sub_frame.slot(&path[1..])?;
-                Some((sub_slot, slot.index + sub_index))
+                Ok((sub_slot, slot.index + sub_index))
             } else {
-                Some((slot, slot.index))
+                Ok((slot, slot.index))
             }
         } else {
-            panic!("Expected {path:?} to be a slot");
+            Err(Error {
+                span: name.span,
+                message: format!("Expected symbol '{}' to be a slot", name.value),
+            })
         }
     }
 
-    pub fn lookup(&self, path: &[Identifier]) -> Option<Lookup> {
+    pub fn lookup(&self, path: &[Identifier]) -> Result<Lookup> {
         if path.len() == 0 {
-            return None;
+            panic!("Path must have at least one element");
         }
 
-        let symbol = self.symbols.get(&path[0].value)?;
-        Some(match symbol {
+        let name = &path[0];
+        let symbol = self.symbols.get(&name.value).ok_or(Error {
+            span: name.span,
+            message: format!(
+                "No symbol with the name '{}' found in frame '{}'",
+                name.value, self.name
+            ),
+        })?;
+
+        Ok(match symbol {
             Symbol::Block(block, frame) => Lookup::Block(block.clone(), frame.clone()),
             Symbol::Slot(_) => {
                 let (_, index) = self.slot(path)?;
