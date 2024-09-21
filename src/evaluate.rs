@@ -8,7 +8,9 @@ fn evaluate_moving_block(
     output: &mut impl Write,
     block: &Block,
     scope: &Scope,
-) -> std::io::Result<()> {
+) -> std::io::Result<bool> {
+    let mut did_error = false;
+
     for instruction in &block.instructions {
         match instruction {
             Instruction::Add => write!(output, "+")?,
@@ -21,14 +23,16 @@ fn evaluate_moving_block(
             Instruction::CloseLoop => write!(output, "]")?,
 
             Instruction::MovingBlock(block) => {
-                evaluate_moving_block(output, block, scope)?;
+                did_error |= evaluate_moving_block(output, block, scope)?;
             }
 
             Instruction::Using(using) => {
-                evaluate_using(output, using, scope)?;
+                let (using_did_error, _) = evaluate_using(output, using, scope)?;
+                did_error |= using_did_error;
             }
 
             Instruction::Variable(variable) => {
+                did_error = true;
                 display_error_message(
                     &block.file_path,
                     Error {
@@ -39,6 +43,7 @@ fn evaluate_moving_block(
             }
 
             Instruction::MacroInvoke(name, _) => {
+                did_error = true;
                 display_error_message(
                     &block.file_path,
                     Error {
@@ -50,7 +55,7 @@ fn evaluate_moving_block(
         }
     }
 
-    Ok(())
+    Ok(did_error)
 }
 
 fn evaluate(
@@ -59,8 +64,9 @@ fn evaluate(
     frame_offset: usize,
     block: &Block,
     scope: &Scope,
-) -> std::io::Result<usize> {
+) -> std::io::Result<(bool, usize)> {
     let mut frame_offset = frame_offset;
+    let mut did_error = false;
 
     for instruction in &block.instructions {
         match instruction {
@@ -72,6 +78,7 @@ fn evaluate(
             Instruction::CloseLoop => write!(output, "]")?,
 
             Instruction::Left(span) | Instruction::Right(span) => {
+                did_error = true;
                 display_error_message(
                     &block.file_path,
                     Error {
@@ -87,7 +94,9 @@ fn evaluate(
             }
 
             Instruction::Using(using) => {
-                frame_offset += evaluate_using(output, using, scope)?;
+                let (using_did_error, using_frame_offset) = evaluate_using(output, using, scope)?;
+                frame_offset += using_frame_offset;
+                did_error |= using_did_error;
             }
 
             Instruction::Variable(variable) => {
@@ -107,16 +116,23 @@ fn evaluate(
                     }
 
                     Ok(Lookup::Block(block, frame)) => {
-                        frame_offset = evaluate(output, &frame, frame_offset, &block, scope)?;
+                        let (block_did_error, block_frame_offset) =
+                            evaluate(output, &frame, frame_offset, &block, scope)?;
+                        frame_offset = block_frame_offset;
+                        did_error |= block_did_error;
                     }
 
-                    Err(err) => display_error_message(&block.file_path, err),
+                    Err(err) => {
+                        did_error = true;
+                        display_error_message(&block.file_path, err);
+                    }
                 };
             }
 
             Instruction::MacroInvoke(name, arguments) => {
                 let macro_ = scope.macro_(&name.value);
                 if macro_.is_none() {
+                    did_error = true;
                     display_error_message(
                         &block.file_path,
                         Error {
@@ -132,20 +148,29 @@ fn evaluate(
                     Ok(frame) => {
                         #[cfg(feature = "comments")]
                         writeln!(output, "\n\n# {}", name.value)?;
-                        frame_offset =
+                        let (macro_did_error, macro_frame_offset) =
                             evaluate(output, &frame, frame_offset, &macro_.block, scope)?;
+                        frame_offset = macro_frame_offset;
+                        did_error |= macro_did_error;
                     }
 
-                    Err(err) => display_error_message(&block.file_path, err),
+                    Err(err) => {
+                        did_error = true;
+                        display_error_message(&block.file_path, err);
+                    }
                 }
             }
         }
     }
 
-    Ok(frame_offset)
+    Ok((did_error, frame_offset))
 }
 
-fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std::io::Result<usize> {
+fn evaluate_using(
+    output: &mut impl Write,
+    using: &Using,
+    scope: &Scope,
+) -> std::io::Result<(bool, usize)> {
     let frame_definition = scope.frame_definition(&using.frame.value);
     if frame_definition.is_none() {
         display_error_message(
@@ -155,7 +180,7 @@ fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std:
                 message: format!("Error: No frame '{}' found", using.frame.value),
             },
         );
-        return Ok(0);
+        return Ok((true, 0));
     }
 
     #[cfg(feature = "comments")]
@@ -165,13 +190,17 @@ fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std:
     evaluate(output, &frame, 0, &using.block, scope)
 }
 
-pub fn evaluate_program(output: &mut impl Write, program: &Program) -> std::io::Result<()> {
+pub fn evaluate_program(output: &mut impl Write, program: &Program) -> std::io::Result<bool> {
+    let mut did_error = false;
+
     let scope = Scope::new(program, &std::env::current_dir()?)?;
     for definition in program {
         if let Definition::Using(using) = definition {
-            evaluate_using(output, using, &scope)?;
+            let (using_did_error, _) = evaluate_using(output, using, &scope)?;
+            did_error |= using_did_error;
         }
     }
 
-    Ok(())
+    writeln!(output)?;
+    Ok(did_error)
 }
