@@ -85,3 +85,10 @@ Identifier: Identifier = {
 }
 
 String: String = <s:r#""[^"]*""#> => s[1..s.len()-1].to_owned();
+
+match {
+    r"\s*" => {},
+    r"#.*\n" => {},
+} else {
+    _
+}
