@@ -130,6 +130,8 @@ fn evaluate(
                 let macro_ = macro_.unwrap();
                 match frame.macro_frame(&macro_.parameters, &arguments) {
                     Ok(frame) => {
+                        #[cfg(feature = "comments")]
+                        writeln!(output, "\n\n# {}", name.value)?;
                         frame_offset =
                             evaluate(output, &frame, frame_offset, &macro_.block, scope)?;
                     }
@@ -155,6 +157,9 @@ fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std:
         );
         return Ok(0);
     }
+
+    #[cfg(feature = "comments")]
+    writeln!(output, "\n# Using frame '{}'", using.frame.value)?;
 
     let frame = Frame::from_definition(frame_definition.unwrap(), scope);
     evaluate(output, &frame, 0, &using.block, scope)
