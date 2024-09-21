@@ -1,0 +1,19 @@
+macro move(src, dest) {
+    src[
+        dest+
+        src-
+    ]
+}
+
+macro double_move(src, dest1, dest2) {
+    src[
+        dest1+
+        dest2+
+        src-
+    ]
+}
+
+macro copy(src, dest, temp) {
+    double_move(src, dest, temp)
+    move(temp, src)
+}

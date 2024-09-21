@@ -1,0 +1,34 @@
+include "memory.bfm"
+
+frame Stack {
+    marker data
+}
+
+macro stack_init(stack) {
+    # Set initial end marker
+    stack.data -
+}
+
+macro stack_push(stack, value) {
+    # Set start marker
+    stack.marker -
+
+    moving {
+        # Move to the end marker
+        >+[->+]
+
+        # Set the new end marker
+        >-
+
+        # Move back to the start marker
+        <<+[
+            # Shift each element forward one
+            -
+            [>+<-]
+            <+
+        ]
+    }
+
+    # Move value to the top of the stack
+    move(value, stack.data)
+}
