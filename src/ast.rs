@@ -61,6 +61,7 @@ pub enum Argument {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub instructions: Vec<Instruction>,
+    pub span: Span,
     pub file_path: Option<PathBuf>,
 }
 

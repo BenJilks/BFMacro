@@ -144,7 +144,7 @@ fn evaluate(
                 }
 
                 let macro_ = macro_.unwrap();
-                match frame.macro_frame(&macro_.parameters, &arguments) {
+                match frame.macro_frame(&macro_.name, &macro_.parameters, &arguments) {
                     Ok(frame) => {
                         #[cfg(feature = "comments")]
                         writeln!(output, "\n\n# {}", name.value)?;

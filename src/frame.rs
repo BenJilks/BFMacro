@@ -1,5 +1,5 @@
 use crate::ast::{Argument, Block, FrameDefinition, Identifier, SlotDefinition};
-use crate::error::{Error, Result};
+use crate::error::{arguments_span, Error, Result};
 use crate::scope::Scope;
 use std::collections::HashMap;
 
@@ -72,7 +72,23 @@ impl Frame {
         }
     }
 
-    pub fn macro_frame(&self, parameters: &[Identifier], arguments: &[Argument]) -> Result<Self> {
+    pub fn macro_frame(
+        &self,
+        name: &Identifier,
+        parameters: &[Identifier],
+        arguments: &[Argument],
+    ) -> Result<Self> {
+        if parameters.len() != arguments.len() {
+            return Err(Error {
+                span: arguments_span(arguments).unwrap_or(name.span),
+                message: format!(
+                    "Macro expected {} arguments, got {}",
+                    parameters.len(),
+                    arguments.len()
+                ),
+            });
+        }
+
         let mut symbols = HashMap::new();
         for (name, argument) in parameters.iter().zip(arguments) {
             match argument {

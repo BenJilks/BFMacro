@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{Span, Variable};
+use crate::ast::{Argument, Span, Variable};
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub struct Error {
@@ -66,4 +66,21 @@ pub fn variable_span(variable: &Variable) -> Span {
     let (start, _) = variable.first().unwrap().span;
     let (_, end) = variable.last().unwrap().span;
     (start, end)
+}
+
+fn argument_span(argument: &Argument) -> Span {
+    match argument {
+        Argument::Variable(variable) => variable_span(variable),
+        Argument::Block(block) => block.span,
+    }
+}
+
+pub fn arguments_span(arguments: &[Argument]) -> Option<Span> {
+    if arguments.is_empty() {
+        return None;
+    }
+
+    let (start, _) = argument_span(arguments.first().unwrap());
+    let (_, end) = argument_span(arguments.last().unwrap());
+    Some((start, end))
 }

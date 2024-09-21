@@ -34,7 +34,8 @@ Slot: SlotDefinition = {
 }
 
 Block: Block = {
-    (<Instruction>)* => Block { instructions: <>, file_path: None },
+    <l: @L> <instructions: (<Instruction>)*> <r: @R> =>
+        Block { instructions: instructions, span: (l, r), file_path: None },
 }
 
 Instruction: Instruction = {
