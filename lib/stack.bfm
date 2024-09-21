@@ -32,3 +32,29 @@ macro stack_push(stack, value) {
     # Move value to the top of the stack
     move(value, stack.data)
 }
+
+macro stack_pop(stack, value) {
+    # Move top of the stack into value
+    move(stack.data, value)
+
+    # Set start marker
+    stack.marker -
+
+    moving {
+        # Move to the end marker
+        >+[
+            -
+
+            # Shift each element back one
+            [<+>-]
+
+            >+
+        ]
+
+        # Set new end marker
+        <-
+
+        # Move back to the start marker
+        <+[-<+]
+    }
+}
