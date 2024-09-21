@@ -161,7 +161,7 @@ fn evaluate_using(output: &mut impl Write, using: &Using, scope: &Scope) -> std:
 }
 
 pub fn evaluate_program(output: &mut impl Write, program: &Program) -> std::io::Result<()> {
-    let scope = Scope::new(program)?;
+    let scope = Scope::new(program, &std::env::current_dir()?)?;
     for definition in program {
         if let Definition::Using(using) = definition {
             evaluate_using(output, using, &scope)?;

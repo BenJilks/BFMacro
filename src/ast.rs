@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 pub type Program = Vec<Definition>;
 pub type Variable = Vec<Identifier>;
 
@@ -59,7 +61,7 @@ pub enum Argument {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub instructions: Vec<Instruction>,
-    pub file_path: Option<String>,
+    pub file_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -70,7 +72,7 @@ pub struct Identifier {
 
 pub type Span = (usize, usize);
 
-fn set_block_file_path(block: &mut Block, file_path: &str) {
+fn set_block_file_path(block: &mut Block, file_path: &Path) {
     block.file_path = Some(file_path.to_owned());
     for instruction in &mut block.instructions {
         match instruction {
@@ -92,7 +94,7 @@ fn set_block_file_path(block: &mut Block, file_path: &str) {
     }
 }
 
-pub fn set_program_file_path(program: &mut Program, file_path: &str) {
+pub fn set_program_file_path(program: &mut Program, file_path: &Path) {
     for definition in program {
         match definition {
             Definition::Macro(macro_) => {

@@ -3,6 +3,7 @@ use crate::macro_parser;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 
 pub struct Scope {
     frame_definitions: HashMap<String, FrameDefinition>,
@@ -11,35 +12,41 @@ pub struct Scope {
 }
 
 impl Scope {
-    pub fn new(program: &Program) -> std::io::Result<Self> {
+    pub fn new(program: &Program, base_path: &Path) -> std::io::Result<Self> {
         let mut scope = Scope {
             frame_definitions: HashMap::new(),
             macros: HashMap::new(),
             includes: HashSet::new(),
         };
 
-        scope.add_program(program)?;
+        scope.add_program(program, base_path)?;
         Ok(scope)
     }
 
-    fn add_program(&mut self, program: &Program) -> std::io::Result<()> {
+    fn add_program(&mut self, program: &Program, base_path: &Path) -> std::io::Result<()> {
         for definition in program {
             match definition {
                 Definition::Include(file_path) => {
                     if self.includes.contains(file_path) {
                         continue;
                     }
+                    self.includes.insert(file_path.clone());
 
-                    let mut file = File::open(file_path)?;
+                    let file_path = base_path.join(file_path);
+                    let mut file = File::open(&file_path)?;
                     let mut script = String::new();
                     file.read_to_string(&mut script)?;
 
                     let parser = macro_parser::ProgramParser::new();
                     let mut program = parser.parse(&script).unwrap();
-                    set_program_file_path(&mut program, file_path);
+                    set_program_file_path(&mut program, &file_path);
 
-                    self.includes.insert(file_path.clone());
-                    self.add_program(&program)?;
+                    self.add_program(
+                        &program,
+                        &file_path
+                            .parent()
+                            .expect("You can't use the root directory as a bfm file"),
+                    )?;
                 }
 
                 Definition::Frame(frame) => {

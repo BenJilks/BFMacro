@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 
 use crate::ast::{Span, Variable};
 
@@ -9,23 +10,28 @@ pub struct Error {
     pub message: String,
 }
 
-fn read_source(file_path: &str) -> std::io::Result<String> {
+fn read_source(file_path: &Path) -> std::io::Result<String> {
     let mut file = File::open(file_path)?;
     let mut source = String::new();
     file.read_to_string(&mut source)?;
     Ok(source)
 }
 
-pub fn display_error_message(file_path: &Option<String>, error: Error) {
+pub fn display_error_message(file_path: &Option<PathBuf>, error: Error) {
     if file_path.is_none() {
         println!("Error in unknown location: {}", error.message);
         return;
     }
 
     let file_path = file_path.as_ref().unwrap();
+    let file_path_string = file_path.to_string_lossy();
+
     let source = read_source(&file_path);
     if source.is_err() {
-        println!("Error in invalid file '{file_path}': {}", error.message);
+        println!(
+            "Error in invalid file '{file_path_string}': {}",
+            error.message
+        );
     }
 
     let source = source.unwrap();
@@ -50,7 +56,7 @@ pub fn display_error_message(file_path: &Option<String>, error: Error) {
     }
 
     let line = &source[line_start..line_end];
-    println!("\n{file_path}:{line_count} {line}");
+    println!("\n{file_path_string}:{line_count} {line}");
     println!("Error: {}", error.message);
 }
 
