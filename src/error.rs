@@ -68,7 +68,7 @@ pub fn variable_span(variable: &Variable) -> Span {
     (start, end)
 }
 
-fn argument_span(argument: &Argument) -> Span {
+pub fn argument_span(argument: &Argument) -> Span {
     match argument {
         Argument::Variable(variable) => variable_span(variable),
         Argument::Block(block) => block.span,

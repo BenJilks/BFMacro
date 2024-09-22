@@ -1,4 +1,4 @@
-use crate::ast::{Program, Definition, FrameDefinition, SlotDefinition, Macro, Using};
+use crate::ast::{Program, Definition, FrameDefinition, SlotDefinition, Macro, Parameter, Using};
 use crate::ast::{Variable, Argument, Block, Instruction};
 use crate::ast::Identifier;
 
@@ -13,19 +13,25 @@ Definition: Definition = {
     "frame" <name: Identifier> "{" <slots: (<Slot>)*> "}" =>
         Definition::Frame(FrameDefinition { name, slots }),
 
-    "macro" <name: Identifier> "(" <parameters: ParameterList> ")" "{" <block: Block> "}" =>
+    "macro" <name: Identifier> "(" <parameters: ParameterList> ")" <block: Block> =>
         Definition::Macro(Macro { name, parameters, block }),
 
-    "using" <frame: Identifier> "{" <block: Block> "}" => 
+    "using" <frame: Identifier> <block: Block> => 
         Definition::Using(Using { frame, block }),
 }
 
-ParameterList: Vec<Identifier> = {
-    <parameters: (<Identifier> ",")*> <last: Identifier?> => {
+ParameterList: Vec<Parameter> = {
+    <parameters: (<Parameter> ",")*> <last: Parameter?> => {
         let mut parameters = parameters;
         parameters.extend(last);
         parameters
     }
+}
+
+Parameter: Parameter = {
+    <Identifier> => Parameter::Slot(<>),
+    <Identifier> ":" "block" => Parameter::Block(<>),
+    <Identifier> ":" <Identifier> => Parameter::SubFrame(<>),
 }
 
 Slot: SlotDefinition = {
@@ -34,7 +40,7 @@ Slot: SlotDefinition = {
 }
 
 Block: Block = {
-    <l: @L> <instructions: (<Instruction>)*> <r: @R> =>
+    <l: @L> "{" <instructions: (<Instruction>)*> "}" <r: @R> =>
         Block { instructions: instructions, span: (l, r), file_path: None },
 }
 
@@ -47,8 +53,8 @@ Instruction: Instruction = {
     "@" => Instruction::Output,
     "[" => Instruction::OpenLoop,
     "]" => Instruction::CloseLoop,
-    "moving" "{" <Block> "}" => Instruction::MovingBlock(<>),
-    "using" <frame: Identifier> "{" <block: Block> "}" => Instruction::Using(Using { frame, block }),
+    "moving" <Block> => Instruction::MovingBlock(<>),
+    "using" <frame: Identifier> <block: Block> => Instruction::Using(Using { frame, block }),
     <Variable> => Instruction::Variable(<>),
 
     <name: Identifier> "(" <arguments: ArgumentList> ")" =>
@@ -65,7 +71,7 @@ ArgumentList: Vec<Argument> = {
 
 Argument: Argument = {
     <Variable> => Argument::Variable(<>),
-    "{" <Block> "}" => Argument::Block(<>),
+    <Block> => Argument::Block(<>),
 }
 
 Variable: Variable = {

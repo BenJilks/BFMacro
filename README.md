@@ -52,7 +52,7 @@ using Main {
 In addition to named cells, you can also provide block as arguments to macros. When referenced by the macro, it will evaluate the block in the original frame context it was created in.
 
 ```
-macro while(a, do) {
+macro while(a, do: block) {
     a[
         do
         a
@@ -85,13 +85,17 @@ frame Main {
     b
 }
 
-using Main {
-    vec.x +
-    vec.y ++
-    b +++
+macro inc_vec2(vec: Vector2) {
+    vec.x+
+    vec.y+
 }
 
-# Compiles to: ">+>++>+++"
+using Main {
+    inc_vec2(vec)
+    b ++
+}
+
+# Compiles to: ">+>+>++"
 ```
 
 ### Moving Blocks

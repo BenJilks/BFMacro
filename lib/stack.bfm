@@ -4,12 +4,12 @@ frame Stack {
     marker data
 }
 
-macro stack_init(stack) {
+macro stack_init(stack: Stack) {
     # Set initial end marker
     stack.data -
 }
 
-macro stack_push(stack, value) {
+macro stack_push(stack: Stack, value) {
     # Set start marker
     stack.marker -
 
@@ -33,7 +33,7 @@ macro stack_push(stack, value) {
     move(value, stack.data)
 }
 
-macro stack_pop(stack, value) {
+macro stack_pop(stack: Stack, value) {
     # Move top of the stack into value
     move(stack.data, value)
 

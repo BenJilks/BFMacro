@@ -1,5 +1,5 @@
-use crate::ast::{Argument, Block, FrameDefinition, Identifier, SlotDefinition};
-use crate::error::{arguments_span, Error, Result};
+use crate::ast::{Argument, Block, FrameDefinition, Identifier, Parameter, SlotDefinition};
+use crate::error::{argument_span, arguments_span, Error, Result};
 use crate::scope::Scope;
 use std::collections::HashMap;
 
@@ -72,10 +72,79 @@ impl Frame {
         }
     }
 
+    fn evaluate_macro_parameter(
+        &self,
+        parameter: &Parameter,
+        argument: &Argument,
+    ) -> Result<(String, Symbol)> {
+        match argument {
+            Argument::Variable(variable) => {
+                let (slot, index) = self.slot(variable)?;
+                match parameter {
+                    Parameter::Slot(name) => Ok((
+                        name.value.clone(),
+                        Symbol::Slot(Slot {
+                            index,
+                            sub_frame: slot.sub_frame.clone(),
+                        }),
+                    )),
+
+                    Parameter::SubFrame(name, sub_frame) => {
+                        if slot.sub_frame.is_none() {
+                            return Err(Error {
+                                span: argument_span(argument),
+                                message: format!(
+                                    "Argument must have a sub-frame of '{}'",
+                                    sub_frame.value
+                                ),
+                            });
+                        }
+
+                        let argument_sub_frame = slot.sub_frame.as_ref().unwrap();
+                        if argument_sub_frame.name != sub_frame.value {
+                            return Err(Error {
+                                span: argument_span(argument),
+                                message: format!(
+                                    "Argument must have a sub-frame of '{}', got '{}'",
+                                    sub_frame.value, argument_sub_frame.name,
+                                ),
+                            });
+                        }
+
+                        Ok((
+                            name.value.clone(),
+                            Symbol::Slot(Slot {
+                                index,
+                                sub_frame: slot.sub_frame.clone(),
+                            }),
+                        ))
+                    }
+
+                    Parameter::Block(name) => Err(Error {
+                        span: argument_span(argument),
+                        message: format!("Can only pass a block to parameter '{}'", name.value),
+                    }),
+                }
+            }
+
+            Argument::Block(block) => match parameter {
+                Parameter::Block(name) => Ok((
+                    name.value.clone(),
+                    Symbol::Block(block.clone(), self.clone()),
+                )),
+
+                Parameter::Slot(name) | Parameter::SubFrame(name, _) => Err(Error {
+                    span: argument_span(argument),
+                    message: format!("Can not pass a block to slot parameter '{}'", name.value),
+                }),
+            },
+        }
+    }
+
     pub fn macro_frame(
         &self,
         name: &Identifier,
-        parameters: &[Identifier],
+        parameters: &[Parameter],
         arguments: &[Argument],
     ) -> Result<Self> {
         if parameters.len() != arguments.len() {
@@ -90,26 +159,9 @@ impl Frame {
         }
 
         let mut symbols = HashMap::new();
-        for (name, argument) in parameters.iter().zip(arguments) {
-            match argument {
-                Argument::Variable(variable) => {
-                    let (slot, index) = self.slot(variable)?;
-                    symbols.insert(
-                        name.value.clone(),
-                        Symbol::Slot(Slot {
-                            index,
-                            sub_frame: slot.sub_frame.clone(),
-                        }),
-                    );
-                }
-
-                Argument::Block(block) => {
-                    symbols.insert(
-                        name.value.clone(),
-                        Symbol::Block(block.clone(), self.clone()),
-                    );
-                }
-            }
+        for (parameter, argument) in parameters.iter().zip(arguments) {
+            let (name, symbol) = self.evaluate_macro_parameter(parameter, argument)?;
+            symbols.insert(name, symbol);
         }
 
         Ok(Self {

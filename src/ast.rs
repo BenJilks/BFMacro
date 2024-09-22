@@ -26,8 +26,15 @@ pub enum SlotDefinition {
 #[derive(Debug, Clone)]
 pub struct Macro {
     pub name: Identifier,
-    pub parameters: Vec<Identifier>,
+    pub parameters: Vec<Parameter>,
     pub block: Block,
+}
+
+#[derive(Debug, Clone)]
+pub enum Parameter {
+    Slot(Identifier),
+    SubFrame(Identifier, Identifier),
+    Block(Identifier),
 }
 
 #[derive(Debug, Clone)]
