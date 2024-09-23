@@ -10,6 +10,7 @@ fn evaluate_moving_block(
     scope: &Scope,
 ) -> std::io::Result<bool> {
     let mut did_error = false;
+    let mut loop_depth = 0;
 
     for instruction in &block.instructions {
         match instruction {
@@ -19,8 +20,27 @@ fn evaluate_moving_block(
             Instruction::Right(_) => write!(output, ">")?,
             Instruction::Input => write!(output, ",")?,
             Instruction::Output => write!(output, ".")?,
-            Instruction::OpenLoop => write!(output, "[")?,
-            Instruction::CloseLoop => write!(output, "]")?,
+
+            Instruction::OpenLoop(_) => {
+                loop_depth += 1;
+                write!(output, "[")?;
+            }
+
+            Instruction::CloseLoop(span) => {
+                if loop_depth == 0 {
+                    display_error_message(
+                        &block.file_path,
+                        Error {
+                            span: *span,
+                            message: "Too many closing brackets".to_owned(),
+                        },
+                    );
+                } else {
+                    loop_depth -= 1;
+                }
+
+                write!(output, "]")?;
+            }
 
             Instruction::MovingBlock(block) => {
                 did_error |= evaluate_moving_block(output, block, scope)?;
@@ -55,6 +75,16 @@ fn evaluate_moving_block(
         }
     }
 
+    if loop_depth > 0 {
+        display_error_message(
+            &block.file_path,
+            Error {
+                span: block.span,
+                message: "Too many open brackets".to_owned(),
+            },
+        );
+    }
+
     Ok(did_error)
 }
 
@@ -67,6 +97,7 @@ fn evaluate(
 ) -> std::io::Result<(bool, usize)> {
     let mut frame_offset = frame_offset;
     let mut did_error = false;
+    let mut loop_stack = Vec::<usize>::new();
 
     for instruction in &block.instructions {
         match instruction {
@@ -74,8 +105,43 @@ fn evaluate(
             Instruction::Subtract => write!(output, "-")?,
             Instruction::Input => write!(output, ",")?,
             Instruction::Output => write!(output, ".")?,
-            Instruction::OpenLoop => write!(output, "[")?,
-            Instruction::CloseLoop => write!(output, "]")?,
+
+            Instruction::OpenLoop(_) => {
+                loop_stack.push(frame_offset);
+                write!(output, "[")?;
+            }
+
+            Instruction::CloseLoop(span) => {
+                match loop_stack.pop() {
+                    Some(loop_start_offset) => {
+                        if loop_start_offset != frame_offset {
+                            did_error = true;
+                            display_error_message(
+                                &block.file_path,
+                                Error {
+                                    span: *span,
+                                    message:
+                                        "Must exit a loop at the same pointer that you entered"
+                                            .to_owned(),
+                                },
+                            );
+                        }
+                    }
+
+                    None => {
+                        did_error = true;
+                        display_error_message(
+                            &block.file_path,
+                            Error {
+                                span: *span,
+                                message: "Too many closing brackets".to_owned(),
+                            },
+                        );
+                    }
+                }
+
+                write!(output, "]")?;
+            }
 
             Instruction::Left(span) | Instruction::Right(span) => {
                 did_error = true;
@@ -161,6 +227,16 @@ fn evaluate(
                 }
             }
         }
+    }
+
+    if !loop_stack.is_empty() {
+        display_error_message(
+            &block.file_path,
+            Error {
+                span: block.span,
+                message: "Too many open brackets".to_owned(),
+            },
+        );
     }
 
     Ok((did_error, frame_offset))
