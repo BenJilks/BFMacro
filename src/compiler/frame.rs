@@ -1,6 +1,6 @@
-use crate::ast::{Argument, Block, FrameDefinition, Identifier, Parameter, SlotDefinition};
-use crate::error::{argument_span, arguments_span, Error, Result};
-use crate::scope::Scope;
+use super::ast::{Argument, Block, FrameDefinition, Identifier, Parameter, SlotDefinition};
+use super::error::{argument_span, arguments_span, Error, Result};
+use super::scope::Scope;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]

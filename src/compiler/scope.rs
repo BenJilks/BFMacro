@@ -1,5 +1,5 @@
-use crate::ast::{set_program_file_path, Definition, FrameDefinition, Macro, Program};
-use crate::macro_parser;
+use super::ast::{set_program_file_path, Definition, FrameDefinition, Macro, Program};
+use super::macro_parser;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;

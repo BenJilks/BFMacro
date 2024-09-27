@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{Argument, Span, Variable};
+use super::ast::{Argument, Span, Variable};
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub struct Error {

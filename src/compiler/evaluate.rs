@@ -1,7 +1,7 @@
-use crate::ast::{Block, Definition, Instruction, Program, Using};
-use crate::error::{display_error_message, variable_span, Error};
-use crate::frame::{Frame, Lookup};
-use crate::scope::Scope;
+use super::ast::{Block, Definition, Instruction, Program, Using};
+use super::error::{display_error_message, variable_span, Error};
+use super::frame::{Frame, Lookup};
+use super::scope::Scope;
 use std::io::Write;
 
 fn evaluate_moving_block(
@@ -21,7 +21,7 @@ fn evaluate_moving_block(
             Instruction::Input => write!(output, ",")?,
             Instruction::Output => write!(output, ".")?,
 
-            Instruction::OpenLoop(_) => {
+            Instruction::OpenLoop => {
                 loop_depth += 1;
                 write!(output, "[")?;
             }
@@ -106,7 +106,7 @@ fn evaluate(
             Instruction::Input => write!(output, ",")?,
             Instruction::Output => write!(output, ".")?,
 
-            Instruction::OpenLoop(_) => {
+            Instruction::OpenLoop => {
                 loop_stack.push(frame_offset);
                 write!(output, "[")?;
             }

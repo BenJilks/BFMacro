@@ -1,6 +1,6 @@
-use crate::ast::{Program, Definition, FrameDefinition, SlotDefinition, Macro, Parameter, Using};
-use crate::ast::{Variable, Argument, Block, Instruction};
-use crate::ast::Identifier;
+use super::ast::{Program, Definition, FrameDefinition, SlotDefinition, Macro, Parameter, Using};
+use super::ast::{Variable, Argument, Block, Instruction};
+use super::ast::Identifier;
 
 grammar;
 
@@ -51,7 +51,7 @@ Instruction: Instruction = {
     <l: @L> ">" <r: @R> => Instruction::Right((l, r)),
     "," => Instruction::Input,
     "@" => Instruction::Output,
-    <l: @L> "[" <r: @R> => Instruction::OpenLoop((l, r)),
+    "[" => Instruction::OpenLoop,
     <l: @L> "]" <r: @R> => Instruction::CloseLoop((l, r)),
     "moving" <Block> => Instruction::MovingBlock(<>),
     "using" <frame: Identifier> <block: Block> => Instruction::Using(Using { frame, block }),

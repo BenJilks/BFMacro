@@ -51,7 +51,7 @@ pub enum Instruction {
     Right(Span),
     Input,
     Output,
-    OpenLoop(Span),
+    OpenLoop,
     CloseLoop(Span),
     MovingBlock(Block),
     Using(Using),
