@@ -2,28 +2,24 @@ use super::ast::{Block, Definition, Instruction, Program, Using};
 use super::error::{display_error_message, variable_span, Error};
 use super::frame::{Frame, Lookup};
 use super::scope::Scope;
-use std::io::Write;
+use crate::bf::{self, BF};
 
-fn evaluate_moving_block(
-    output: &mut impl Write,
-    block: &Block,
-    scope: &Scope,
-) -> std::io::Result<bool> {
+fn evaluate_moving_block(output: &mut BF, block: &Block, scope: &Scope) -> bool {
     let mut did_error = false;
     let mut loop_depth = 0;
 
     for instruction in &block.instructions {
         match instruction {
-            Instruction::Add => write!(output, "+")?,
-            Instruction::Subtract => write!(output, "-")?,
-            Instruction::Left(_) => write!(output, "<")?,
-            Instruction::Right(_) => write!(output, ">")?,
-            Instruction::Input => write!(output, ",")?,
-            Instruction::Output => write!(output, ".")?,
+            Instruction::Add => output.push(bf::Instruction::Add),
+            Instruction::Subtract => output.push(bf::Instruction::Subtract),
+            Instruction::Left(_) => output.push(bf::Instruction::Left),
+            Instruction::Right(_) => output.push(bf::Instruction::Right),
+            Instruction::Input => output.push(bf::Instruction::Input),
+            Instruction::Output => output.push(bf::Instruction::Output),
 
             Instruction::OpenLoop => {
                 loop_depth += 1;
-                write!(output, "[")?;
+                output.push(bf::Instruction::OpenLoop);
             }
 
             Instruction::CloseLoop(span) => {
@@ -39,15 +35,15 @@ fn evaluate_moving_block(
                     loop_depth -= 1;
                 }
 
-                write!(output, "]")?;
+                output.push(bf::Instruction::CloseLoop);
             }
 
             Instruction::MovingBlock(block) => {
-                did_error |= evaluate_moving_block(output, block, scope)?;
+                did_error |= evaluate_moving_block(output, block, scope);
             }
 
             Instruction::Using(using) => {
-                let (using_did_error, _) = evaluate_using(output, using, scope)?;
+                let (using_did_error, _) = evaluate_using(output, using, scope);
                 did_error |= using_did_error;
             }
 
@@ -85,30 +81,30 @@ fn evaluate_moving_block(
         );
     }
 
-    Ok(did_error)
+    did_error
 }
 
 fn evaluate(
-    output: &mut impl Write,
+    output: &mut BF,
     frame: &Frame,
     frame_offset: usize,
     block: &Block,
     scope: &Scope,
-) -> std::io::Result<(bool, usize)> {
+) -> (bool, usize) {
     let mut frame_offset = frame_offset;
     let mut did_error = false;
     let mut loop_stack = Vec::<usize>::new();
 
     for instruction in &block.instructions {
         match instruction {
-            Instruction::Add => write!(output, "+")?,
-            Instruction::Subtract => write!(output, "-")?,
-            Instruction::Input => write!(output, ",")?,
-            Instruction::Output => write!(output, ".")?,
+            Instruction::Add => output.push(bf::Instruction::Add),
+            Instruction::Subtract => output.push(bf::Instruction::Subtract),
+            Instruction::Input => output.push(bf::Instruction::Input),
+            Instruction::Output => output.push(bf::Instruction::Output),
 
             Instruction::OpenLoop => {
                 loop_stack.push(frame_offset);
-                write!(output, "[")?;
+                output.push(bf::Instruction::OpenLoop);
             }
 
             Instruction::CloseLoop(span) => {
@@ -140,7 +136,7 @@ fn evaluate(
                     }
                 }
 
-                write!(output, "]")?;
+                output.push(bf::Instruction::CloseLoop);
             }
 
             Instruction::Left(span) | Instruction::Right(span) => {
@@ -156,11 +152,11 @@ fn evaluate(
             }
 
             Instruction::MovingBlock(block) => {
-                evaluate_moving_block(output, block, scope)?;
+                evaluate_moving_block(output, block, scope);
             }
 
             Instruction::Using(using) => {
-                let (using_did_error, using_frame_offset) = evaluate_using(output, using, scope)?;
+                let (using_did_error, using_frame_offset) = evaluate_using(output, using, scope);
                 frame_offset += using_frame_offset;
                 did_error |= using_did_error;
             }
@@ -170,11 +166,11 @@ fn evaluate(
                     Ok(Lookup::Slot(offset)) => {
                         if offset > frame_offset {
                             for _ in frame_offset..offset {
-                                write!(output, ">")?;
+                                output.push(bf::Instruction::Left);
                             }
                         } else if offset < frame_offset {
                             for _ in offset..frame_offset {
-                                write!(output, "<")?;
+                                output.push(bf::Instruction::Right);
                             }
                         }
 
@@ -183,7 +179,7 @@ fn evaluate(
 
                     Ok(Lookup::Block(block, frame)) => {
                         let (block_did_error, block_frame_offset) =
-                            evaluate(output, &frame, frame_offset, &block, scope)?;
+                            evaluate(output, &frame, frame_offset, &block, scope);
                         frame_offset = block_frame_offset;
                         did_error |= block_did_error;
                     }
@@ -215,7 +211,7 @@ fn evaluate(
                         #[cfg(feature = "comments")]
                         writeln!(output, "\n\n# {}", name.value)?;
                         let (macro_did_error, macro_frame_offset) =
-                            evaluate(output, &frame, frame_offset, &macro_.block, scope)?;
+                            evaluate(output, &frame, frame_offset, &macro_.block, scope);
                         frame_offset = macro_frame_offset;
                         did_error |= macro_did_error;
                     }
@@ -239,14 +235,10 @@ fn evaluate(
         );
     }
 
-    Ok((did_error, frame_offset))
+    (did_error, frame_offset)
 }
 
-fn evaluate_using(
-    output: &mut impl Write,
-    using: &Using,
-    scope: &Scope,
-) -> std::io::Result<(bool, usize)> {
+fn evaluate_using(output: &mut BF, using: &Using, scope: &Scope) -> (bool, usize) {
     let frame_definition = scope.frame_definition(&using.frame.value);
     if frame_definition.is_none() {
         display_error_message(
@@ -256,7 +248,7 @@ fn evaluate_using(
                 message: format!("Error: No frame '{}' found", using.frame.value),
             },
         );
-        return Ok((true, 0));
+        return (true, 0);
     }
 
     #[cfg(feature = "comments")]
@@ -266,17 +258,17 @@ fn evaluate_using(
     evaluate(output, &frame, 0, &using.block, scope)
 }
 
-pub fn evaluate_program(output: &mut impl Write, program: &Program) -> std::io::Result<bool> {
+pub fn evaluate_program(program: &Program) -> std::io::Result<(BF, bool)> {
+    let mut output = BF::new();
     let mut did_error = false;
 
     let scope = Scope::new(program, &std::env::current_dir()?)?;
     for definition in program {
         if let Definition::Using(using) = definition {
-            let (using_did_error, _) = evaluate_using(output, using, &scope)?;
+            let (using_did_error, _) = evaluate_using(&mut output, using, &scope);
             did_error |= using_did_error;
         }
     }
 
-    writeln!(output)?;
-    Ok(did_error)
+    Ok((output, did_error))
 }

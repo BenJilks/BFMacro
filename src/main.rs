@@ -1,10 +1,13 @@
 use compiler::evaluate_file;
-use formatter::format_file;
+use simplify::simplify_program;
 use std::env::{args, Args};
+use std::fs::File;
+use std::io::stdout;
 use std::process::ExitCode;
 
+mod bf;
 mod compiler;
-mod formatter;
+mod simplify;
 
 fn usage(executable: &str) {
     eprintln!("Usage: {executable} <action> <file>...");
@@ -41,16 +44,14 @@ fn format(executable: &str, args: Args) -> std::io::Result<ExitCode> {
         return Ok(ExitCode::FAILURE);
     }
 
-    let mut did_error = false;
     for file_path in args {
-        did_error |= format_file(&file_path)?;
+        let file = File::open(file_path)?;
+        let program = bf::parse(file)?;
+        let program = simplify_program(&program);
+        bf::write(stdout(), &program)?;
     }
 
-    if did_error {
-        Ok(ExitCode::FAILURE)
-    } else {
-        Ok(ExitCode::SUCCESS)
-    }
+    Ok(ExitCode::SUCCESS)
 }
 
 fn main() -> std::io::Result<ExitCode> {

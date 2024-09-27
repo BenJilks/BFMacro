@@ -1,3 +1,5 @@
+use crate::bf;
+use crate::simplify::simplify_program;
 use ast::set_program_file_path;
 use evaluate::evaluate_program;
 use std::fs::File;
@@ -22,5 +24,11 @@ pub fn evaluate_file(file_path: &str) -> std::io::Result<bool> {
     let mut program = parser.parse(&script).unwrap();
     set_program_file_path(&mut program, &PathBuf::from("test.bfm"));
 
-    evaluate_program(&mut stdout(), &program)
+    let (bf, did_error) = evaluate_program(&program)?;
+    if did_error {
+        Ok(true)
+    } else {
+        bf::write(stdout(), &simplify_program(&bf))?;
+        Ok(false)
+    }
 }
