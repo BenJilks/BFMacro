@@ -1,4 +1,5 @@
 use compiler::evaluate_file;
+use interpreter::run_program;
 use simplify::simplify_program;
 use std::env::{args, Args};
 use std::fs::File;
@@ -7,6 +8,7 @@ use std::process::ExitCode;
 
 mod bf;
 mod compiler;
+mod interpreter;
 mod simplify;
 
 fn usage(executable: &str) {
@@ -14,6 +16,7 @@ fn usage(executable: &str) {
     eprintln!();
     eprintln!("Actions:");
     eprintln!("   compile    Compile bfmacro files into bf");
+    eprintln!("   run        Run the given bf file");
     eprintln!("   format     Format an simplify bf files");
     eprintln!();
 }
@@ -40,6 +43,21 @@ fn compile(executable: &str, args: Args) -> std::io::Result<ExitCode> {
     } else {
         Ok(ExitCode::SUCCESS)
     }
+}
+
+fn run(executable: &str, mut args: Args) -> std::io::Result<ExitCode> {
+    if args.len() == 0 {
+        usage(executable);
+        eprintln!("{executable}: error: no input files given");
+        return Ok(ExitCode::FAILURE);
+    }
+
+    let file_path = args.next().unwrap();
+    let file = File::open(file_path)?;
+    let program = bf::parse(file)?;
+    run_program(program);
+
+    Ok(ExitCode::SUCCESS)
 }
 
 fn format(executable: &str, args: Args) -> std::io::Result<ExitCode> {
@@ -72,6 +90,7 @@ fn main() -> std::io::Result<ExitCode> {
     let action = args.next().unwrap();
     match action.as_str() {
         "compile" => compile(&executable, args),
+        "run" => run(&executable, args),
         "format" => format(&executable, args),
         _ => {
             usage(&executable);

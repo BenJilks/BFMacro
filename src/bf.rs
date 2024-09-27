@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 pub type BF = Vec<Instruction>;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Instruction {
     Add,
     Subtract,
