@@ -1,5 +1,14 @@
 use crate::bf::{Instruction, BF};
 use std::num::Wrapping;
+use std::io::Read;
+
+fn print_memory(memory: &[Wrapping<u8>], _pointer: usize) {
+    for cell in memory {
+        print!("{cell:03} ");
+    }
+    println!();
+    println!();
+}
 
 pub fn run_program(program: BF) {
     let mut memory = vec![Wrapping(0u8); 1];
@@ -58,6 +67,11 @@ pub fn run_program(program: BF) {
                 }
             }
             Instruction::CloseLoop => pc = stack.pop().unwrap(),
+
+            Instruction::Break => {
+                print_memory(&memory, pointer);
+                std::io::stdin().read(&mut [0u8]).unwrap();
+            }
         }
     }
 }

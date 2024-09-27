@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Instruction {
     Add,
     Subtract,
@@ -10,6 +10,7 @@ pub enum Instruction {
     Output,
     OpenLoop,
     CloseLoop,
+    Break,
 }
 
 pub struct BF {
@@ -45,6 +46,7 @@ impl BF {
                 '.' => Some(Instruction::Output),
                 '[' => Some(Instruction::OpenLoop),
                 ']' => Some(Instruction::CloseLoop),
+                '*' => Some(Instruction::Break),
 
                 '!' => {
                     is_input = true;
@@ -85,6 +87,7 @@ impl BF {
                 Instruction::Output => write!(output, ".")?,
                 Instruction::OpenLoop => write!(output, "[")?,
                 Instruction::CloseLoop => write!(output, "]")?,
+                Instruction::Break => write!(output, "*")?,
             }
 
             column += 1;
