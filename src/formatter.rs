@@ -36,29 +36,65 @@ fn parse_script(script: &str) -> Vec<Instruction> {
     program
 }
 
+fn resolve_combined_move(out: &mut Vec<Instruction>, count: &mut i32) {
+    for _ in 0..count.abs() {
+        if *count > 0 {
+            out.push(Instruction::Right);
+        } else {
+            out.push(Instruction::Left);
+        }
+    }
+
+    *count = 0;
+}
+
+fn resolve_combined_change(out: &mut Vec<Instruction>, count: &mut i32) {
+    for _ in 0..count.abs() {
+        if *count > 0 {
+            out.push(Instruction::Add);
+        } else {
+            out.push(Instruction::Subtract);
+        }
+    }
+
+    *count = 0;
+}
+
 fn simplify_program(program: &[Instruction]) -> Vec<Instruction> {
     let mut simplified = Vec::new();
 
     let mut combined_move = 0i32;
+    let mut combined_change = 0i32;
     for instruction in program {
         match instruction {
-            Instruction::Left => combined_move -= 1,
-            Instruction::Right => combined_move += 1,
-            instruction => {
-                for _ in 0..combined_move.abs() {
-                    if combined_move > 0 {
-                        simplified.push(Instruction::Right);
-                    } else {
-                        simplified.push(Instruction::Left);
-                    }
-                }
+            Instruction::Left => {
+                resolve_combined_change(&mut simplified, &mut combined_change);
+                combined_move -= 1;
+            }
+            Instruction::Right => {
+                resolve_combined_change(&mut simplified, &mut combined_change);
+                combined_move += 1;
+            }
 
-                combined_move = 0;
+            Instruction::Add => {
+                resolve_combined_move(&mut simplified, &mut combined_move);
+                combined_change += 1;
+            }
+            Instruction::Subtract => {
+                resolve_combined_move(&mut simplified, &mut combined_move);
+                combined_change -= 1;
+            }
+
+            instruction => {
+                resolve_combined_move(&mut simplified, &mut combined_move);
+                resolve_combined_change(&mut simplified, &mut combined_change);
                 simplified.push(*instruction);
             }
         }
     }
 
+    resolve_combined_move(&mut simplified, &mut combined_move);
+    resolve_combined_change(&mut simplified, &mut combined_change);
     simplified
 }
 
