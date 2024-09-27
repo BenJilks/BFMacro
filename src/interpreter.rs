@@ -6,6 +6,7 @@ pub fn run_program(program: BF) {
     let mut pointer = 0usize;
     let mut pc = 0usize;
     let mut stack = Vec::<usize>::new();
+    let mut input_pointer = 0usize;
 
     let code = program.code();
     while pc < program.len() {
@@ -30,7 +31,14 @@ pub fn run_program(program: BF) {
                 }
             }
 
-            Instruction::Input => {}
+            Instruction::Input => {
+                if input_pointer >= program.input.len() {
+                    memory[pointer] = Wrapping(0);
+                } else {
+                    memory[pointer] = Wrapping(program.input[input_pointer]);
+                    input_pointer += 1;
+                }
+            }
             Instruction::Output => print!("{}", memory[pointer].0 as char),
 
             Instruction::OpenLoop => {

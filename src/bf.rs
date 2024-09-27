@@ -14,16 +14,28 @@ pub enum Instruction {
 
 pub struct BF {
     code: Vec<Instruction>,
+    pub input: Vec<u8>,
 }
 
 impl BF {
     pub fn new() -> Self {
-        Self { code: Vec::new() }
+        Self {
+            code: Vec::new(),
+            input: Vec::new(),
+        }
     }
 
-    pub fn parse(input: impl Read) -> std::io::Result<Self> {
-        let mut instructions = Vec::new();
-        for char in input.bytes() {
+    pub fn parse(stream: impl Read) -> std::io::Result<Self> {
+        let mut code = Vec::new();
+        let mut input = Vec::new();
+        let mut is_input = false;
+
+        for char in stream.bytes() {
+            if is_input {
+                input.push(char?);
+                continue;
+            }
+
             let instruction = match char? as char {
                 '+' => Some(Instruction::Add),
                 '-' => Some(Instruction::Subtract),
@@ -33,15 +45,20 @@ impl BF {
                 '.' => Some(Instruction::Output),
                 '[' => Some(Instruction::OpenLoop),
                 ']' => Some(Instruction::CloseLoop),
+
+                '!' => {
+                    is_input = true;
+                    None
+                }
                 _ => None,
             };
 
             if let Some(instruction) = instruction {
-                instructions.push(instruction);
+                code.push(instruction);
             }
         }
 
-        Ok(Self { code: instructions })
+        Ok(Self { code, input })
     }
 
     pub fn push(&mut self, instruction: Instruction) {
