@@ -27,7 +27,12 @@ fn compile(executable: &str, args: Args) -> std::io::Result<ExitCode> {
 
     let mut did_error = false;
     for file_path in args {
-        did_error |= evaluate_file(&file_path)?;
+        let program = evaluate_file(&file_path)?;
+        if let Some(program) = program {
+            bf::write(stdout(), &simplify_program(&program))?;
+        } else {
+            did_error = true;
+        }
     }
 
     if did_error {

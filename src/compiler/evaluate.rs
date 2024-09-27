@@ -208,8 +208,6 @@ fn evaluate(
                 let macro_ = macro_.unwrap();
                 match frame.macro_frame(&macro_.name, &macro_.parameters, &arguments) {
                     Ok(frame) => {
-                        #[cfg(feature = "comments")]
-                        writeln!(output, "\n\n# {}", name.value)?;
                         let (macro_did_error, macro_frame_offset) =
                             evaluate(output, &frame, frame_offset, &macro_.block, scope);
                         frame_offset = macro_frame_offset;
@@ -250,9 +248,6 @@ fn evaluate_using(output: &mut BF, using: &Using, scope: &Scope) -> (bool, usize
         );
         return (true, 0);
     }
-
-    #[cfg(feature = "comments")]
-    writeln!(output, "\n# Using frame '{}'", using.frame.value)?;
 
     let frame = Frame::from_definition(frame_definition.unwrap(), scope);
     evaluate(output, &frame, 0, &using.block, scope)
