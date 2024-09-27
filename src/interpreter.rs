@@ -7,8 +7,9 @@ pub fn run_program(program: BF) {
     let mut pc = 0usize;
     let mut stack = Vec::<usize>::new();
 
+    let code = program.code();
     while pc < program.len() {
-        let instruction = program[pc];
+        let instruction = code[pc];
         pc += 1;
 
         match instruction {
@@ -37,7 +38,7 @@ pub fn run_program(program: BF) {
                     let mut depth = 1;
                     while pc < program.len() && depth > 0 {
                         pc += 1;
-                        match program[pc] {
+                        match code[pc] {
                             Instruction::OpenLoop => depth += 1,
                             Instruction::CloseLoop => depth -= 1,
                             _ => {}

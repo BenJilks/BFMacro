@@ -29,7 +29,7 @@ pub fn simplify_program(program: &BF) -> BF {
 
     let mut combined_move = 0i32;
     let mut combined_change = 0i32;
-    for instruction in program {
+    for instruction in program.code() {
         match instruction {
             Instruction::Left => {
                 resolve_combined_change(&mut simplified, &mut combined_change);

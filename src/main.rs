@@ -1,3 +1,4 @@
+use bf::BF;
 use compiler::evaluate_file;
 use interpreter::run_program;
 use simplify::simplify_program;
@@ -32,7 +33,7 @@ fn compile(executable: &str, args: Args) -> std::io::Result<ExitCode> {
     for file_path in args {
         let program = evaluate_file(&file_path)?;
         if let Some(program) = program {
-            bf::write(stdout(), &simplify_program(&program))?;
+            simplify_program(&program).write(stdout())?;
         } else {
             did_error = true;
         }
@@ -54,7 +55,7 @@ fn run(executable: &str, mut args: Args) -> std::io::Result<ExitCode> {
 
     let file_path = args.next().unwrap();
     let file = File::open(file_path)?;
-    let program = bf::parse(file)?;
+    let program = BF::parse(file)?;
     run_program(program);
 
     Ok(ExitCode::SUCCESS)
@@ -69,9 +70,8 @@ fn format(executable: &str, args: Args) -> std::io::Result<ExitCode> {
 
     for file_path in args {
         let file = File::open(file_path)?;
-        let program = bf::parse(file)?;
-        let program = simplify_program(&program);
-        bf::write(stdout(), &program)?;
+        let program = BF::parse(file)?;
+        simplify_program(&program).write(stdout())?;
     }
 
     Ok(ExitCode::SUCCESS)
